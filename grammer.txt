@@ -1,0 +1,16 @@
+block : (list: statement*) ;
+statement
+	: (value: exp1) _ ";"
+	| _ "{" (value: block) _ "}"
+	;
+
+_ : ( " " | "\t" | "\n" )* ;
+
+exp1 : (left: exp2) ( _ (operator: "+" | "-" ) (right: exp2) )* ;
+exp2 : (left: exp3) ( _ (operator: "*" | "/" | "%" ) (right: exp3) )* ;
+exp3 : (value: primary) | _ "(" (value: exp1) _ ")";
+
+primary : _ (value: variable | integer ) ;
+
+variable : (string: /[A-Za-z_]\w*/) ;
+integer : (string: /[0-9]+/) ;
