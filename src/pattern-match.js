@@ -1,11 +1,29 @@
 
-// Each type of node in the grammer rule tree structure has a different process for matching, as defined below:
+var ast = require("./ast"),
+	util = require("./util");
 
 module.exports = {
 
+	// Root Node
+
+	"production" : function(state){
+		state.log(1,"<production>",this.name);
+		state.namedata.push({});
+		var temp = this.pattern.match(state);
+		state.namedata.pop();
+		state.log(1,"</production>", this.name, temp);
+		return temp;
+	},
+
+	// Leaf Nodes
+
+	"empty" : function(state){
+		return "";
+	},
+
 	"string" : function(state){
 		var t = state.data.substr(state.index,this.data.length);
-		state.log("<string/>",this.data,t);
+		state.log(2,"<string/>",this.data,t);
 		if(this.data===t){
 			state.index += t.length;
 			return t;
@@ -18,7 +36,7 @@ module.exports = {
 	"regexp" : function(state){
 		this.data.lastIndex = state.index;
 		var t = this.data.exec(state.data);
-		state.log("<regexp/>",this.data,t, t ? t.index : null, state.index);
+		state.log(2,"<regexp/>",this.data.source,state.data.substr(state.index,10));
 		if(t!==null && t.index===state.index){
 			state.index += t[0].length;
 			return t[0];
@@ -28,71 +46,61 @@ module.exports = {
 		}
 	},
 
-	"production" : function(state){
-		state.log("<production>",this.name);
-		state.namedata.push({});
+	"reference" : function(state){
+		state.log(2,"<reference>",this.name);
 		var temp = state.parser.production[this.name].match(state);
-		if(temp!==null) temp = new state.parser.ast[this.name]( state.namedata.pop() );
-		state.log("</production>", this.name, temp);
+		state.log(2,"</reference>", this.name);
 		return temp;
 	},
+
+	// Flow Control Operations
 
 	"and" : function(state){
 		var local = state.push(state.local({ series:[] })), temp;
 		while(local.series.length < this.series.length){
-			state.log("<and>",this.name,this.series,local.series);
+			state.log(2,"<and>",this.series,local.series);
 			temp = this.series[local.series.length].match(state);
 			if(temp!==null){
 				local.series.push(temp);
 			} else {
 				local = state.local(null);
 				if(local===null){
-					state.log("</and>","mismatch");
+					state.log(2,"</and>","mismatch");
 					state.pop();
 					return null;
 				} else state.top(local);
 			}
 		}
 		temp = state.pop().series;
-		if(this.name!==null && state.namedata.length>0){
-			var last = state.namedata[state.namedata.length-1];
-			if(temp.length===1) temp = temp[0];
-			last[this.name] = (last[this.name] || []).concat(temp);
-			/*
-			if(!(this.name in last)) last[this.name] = temp;
-			else if(!Array.isArray(last[this.name]))
-				last[this.name] = new Array( last[this.name], temp );
-			else last[this.name].push(temp);
-			*/
-		}
-		state.log(1,"</and>",this.name,temp);
-		return temp;
+		state.log(2,1,"</and>",temp);
+		// return temp;
+		return Array.prototype.concat.apply([],temp); // merge subarrays
 	},
 
 	"or" : function(state){
 		var local = state.push(state.local({ choice:0 })), temp;
 
 		while(local.choice < this.options.length){
-			state.log("<or>",this.options,local.choice);
+			state.log(2,"<or>",this.options,local.choice);
 
 			// save next alternative & match current option
 			if(++local.choice < this.options.length) state.save();
 			temp = this.options[--local.choice].match(state);
 
 			if(temp!==null){
-				state.log("</or>",temp);
+				state.log(2,"</or>",temp);
 				state.pop();
 				return temp;
 			} else {
 				local = state.local(null);
 				if(local===null){
-					state.log("</or>","mismatch");
+					state.log(2,"</or>","mismatch");
 					state.pop();
 					return null;
 				}
 				/*
 				The last element of state.localdata needs to be synced with local so that in case of mismatch,
-				the lowest common ancestor of current node & last decision point can be correctly identified.
+				the lowest common ancestor of current astnode & last decision point can be correctly identified.
 				*/
 				else state.top(local);
 			}
@@ -102,7 +110,7 @@ module.exports = {
 	"loop" : function(state){
 		var local = state.push(state.local({ first:true, list:[] }));
 		var i,j,k,temp;
-		state.log("<loop>",this.minimum,this.maximum,this.pattern,local.list);
+		state.log(2,"<loop>",this.pattern,this.minimum,this.maximum,this.greedy,local.list);
 
 		if(local.first){
 
@@ -113,36 +121,105 @@ module.exports = {
 				else break;
 			}
 			if(i<this.minimum){
-				state.log("</loop>","mismatch");
+				state.log(2,"</loop>","mismatch");
 				state.pop();
 				return null;
 			}
 
-			state.save();
-			k = state.alternative.length - 1;
+		}
 
-			for(i=this.minimum; i<this.maximum; ++i){
-				temp = this.pattern.match(state);
-				if(temp!==null) local.list.push(temp);
-				else { state.ignore(); break; }
-			}
-			
-			if(local.list.length===this.minimum){
-				state.alternative.splice(k,1);
+		if(this.greedy){
+
+			if(local.first){
+
+				state.save();
+				k = state.alternative.length - 1;
+
+				for(i=this.minimum; i<this.maximum; ++i){
+					j = util.clone(state);
+					temp = this.pattern.match(j);
+					if(temp===null) break;
+					state.sync(j);
+					local = state.top();
+					local.list.push(temp);
+				}
+				
+				if(local.list.length===this.minimum){
+					state.alternative.splice(k,1);
+				} else {
+					temp = state.alternative[k].localdata;
+					temp[temp.length-1].first = false;
+					temp[temp.length-1].list = local.list.slice(0,-1);
+				}
+
 			} else {
-				temp = state.alternative[k].localdata;
-				temp[temp.length-1].first = false;
-				temp[temp.length-1].list = local.list.slice(0,-1);
+
+				temp = local.list.pop();
+				if(local.list.length>this.minimum) state.save();
+				local.list.push(temp);
+
 			}
 
-		} else {
-			temp = local.list.pop();
-			if(local.list.length>this.minimum) state.save();
-			local.list.push(temp);
+		} else { // if not greedy
+
+			if(local.first) local.first = false;
+
+			k = util.clone(state);
+			temp = this.pattern.match( k );
+			if(temp!==null){
+				i = k.top(); i.list.push(temp); k.top(i);
+				k.save();
+				state.alternative.push( k.alternative.pop() );
+			}
+
 		}
 
 		temp = state.pop().list;
-		state.log(1,"</loop>",temp);
+		state.log(2,1,"</loop>",temp);
+		return Array.prototype.concat.apply([],temp); // merge subarrays
+	},
+
+	"lookahead" : function(state){
+		state.log(2,"<lookahead>",this.name);
+		var index = state.index;
+		var temp = this.pattern.match(state);
+		state.log(2,"</lookahead>",this.name,temp);
+		if(temp) state.index = index;
+		return temp;
+	},
+
+	// Interactive Nodes
+
+	"label" : function(state){
+		state.log(2,"<label>",this.name);
+		var temp = this.pattern.match(state);
+		var last = state.namedata[state.namedata.length-1] || {};
+		state.log(2,"</label>",this.name,temp);
+		if(temp) last[this.name] = (last[this.name] || []).concat(temp);
+		return temp;
+	},
+
+	"action" : function(state){
+		state.log(2,"<action>");
+		state.namedata.push({});
+		var temp = this.pattern.match(state);
+		var data = state.namedata.pop();  // data can be undefined if names are specified outside actions
+		if(temp){
+			for(var key in data)
+				if(data[key].length===0) delete data[key];
+				else if(data[key].length===1) data[key] = data[key][0];
+			temp = new ast( this.labels , data || {} , this.code );
+		}
+		state.log(2,"</action>",temp);
+		return temp;
+	},
+
+	"predicate" : function(state){
+		state.log(2,"<predicate>");
+		// state.namedata.push({});
+		var temp = this.pattern.match(state);
+		// var data = state.namedata.pop();
+		state.log(2,"</predicate>");
 		return temp;
 	}
 

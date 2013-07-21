@@ -1,35 +1,34 @@
 
 var tokenize = require("./tokenizer"),
-	build = require("./builder"),
-	pattern = require("./pattern"),
-	ast = require("./ast"),
+	build = require("./build"),
 	State = require("./state");
 
 var Parser = function(grammer){
 	this.production = {};
-	this.ast = {};
-	var start = null;
+	this.init = "";
+	this.start = null;
 
-	var tlist = tokenize(grammer), rule;
+	var tlist = tokenize(grammer);
+	if(tlist.peek() && tlist.peek().type==="code")
+		this.init = tlist.next().data;
+
+	var p;
 	while(tlist.peek()){
-		rule = build(tlist);
-		if(rule.name){
-			if(start===null) start = rule.name;
-			this.production[rule.name] = rule;
-			this.ast[rule.name] = ast(rule.name);
-			rule.name = null; // explain
-		}
+		p = build.production(tlist);
+		this.production[ p.name ] = p;
+		if(!this.start) this.start = p;
 	}
 
-	if(start) this.production["~"] = new pattern.production(start);
-	else throw new Error("Empty Grammer");
+	if(!this.start) throw new Error("Empty Grammer");
 };
 
-Parser.prototype.process = function(code){
-	var state = new State(this,code);
-	return this.production["~"].match(state);
+Parser.prototype.parse = function(data){
+	var state = new State(this,data),
+		ast = this.start.match(state);
+	if(state.index<data.length)
+		throw new Error("Could not parse beyond index : "+state.index);
+	ast.init = this.init;
+	return ast;
 };
-
-
 
 module.exports = Parser;

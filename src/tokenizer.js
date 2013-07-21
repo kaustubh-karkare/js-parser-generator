@@ -29,29 +29,103 @@ TokenList.prototype.next = function(){
 
 
 
+
+
+var hex = function(str,len){
+	if(str.length!==len) throw new Error("Unexpected End of String");
+	if(str.match(/[^0-9A-F]/i)) throw new Error("Unexpected Symbol in String");
+	return String.fromCharCode(parseInt(str,16));
+};
+
+var operators = ["=","(",")","|","?","*","+",":",";"];
+
 var tokenize = function(str){
 	var i = 0, result = [], current;
 	while(i<str.length){
-		while (str[i]===" " || str[i]==="\t" || str[i]==="\n") ++i; // skip whitespace
-		if(str[i]==="\""){
+
+		// whitespace
+		if(str[i]===" " || str[i]==="\t" || str[i]==="\n"){
+			++i;
+
+		// single line comments
+		} else if(str.substr(i,2)==="//"){
+			i+=2;
+			while(str[++i] && str[i]!=="\n");
+			++i;
+
+		// multiline comments
+		} else if(str.substr(i,2)==="/*"){
+			i+=2;
+			while(str[++i] && str.substr(i,2)!=="*/");
+			i+=2;
+
+		// strings
+		} else if(str[i]==="\""){
 			current = "";
 			while(str[++i]!=="\"")
-				current += (str[i]==="\\" ? ( i++ , escapable[str[i]] || str[i] ) : str[i]);
+				if(str[i]===undefined) throw new Error("Unexpected End of String");
+				else if(str[i]!=="\\") current += str[i];
+				else if(str[++i] in escapable) current += escapable[str[i]];
+				else if(str[i]==="x"){ current += hex(str.substr(++i,2),2); i+=2; }
+				else if(str[i]==="u"){ current += hex(str.substr(++i,4),4); i+=4; }
+				else current += str[i];
 			result.push( new Token("string",current) );
 			++i;
+
+		// regular expressions (without flags)
 		} else if(str[i]==="/"){
 			current = "";
 			while(str[++i]!=="/")
-				current += (str[i]==="\\" && str[i+1]==="/" ? str[++i] : str[i]);
+				if(str[i]===undefined) throw new Error("Unexpected End of RegExp");
+				else current += (str[i]==="\\" && str[i+1]==="/" ? str[++i] : str[i]);
 			result.push( new Token("regexp",current) );
 			++i;
+
+		// code blocks
+		} else if(str[i]==="{"){
+			current = str[i];
+			var nesting = 1, delimiter;
+			while(nesting>0 && str[++i]){
+				if(str.substr(i,2)==="//"){
+					i+=2;
+					while(str[++i] && str[i]!=="\n");
+				} else if(str.substr(i,2)==="/*"){
+					i+=2;
+					while(str[++i] && str.substr(i,2)!=="*/");
+				} else if(str[i]==="\""){ // || str[i]==="/"
+					current += delimiter = str[i];
+					while(str[++i])
+						if(str[i]===delimiter) break;
+						else if(str[i]==="\\") current += str[++i];
+						else current += str[i];
+					current += str[i];
+				} else if(str[i]==="{"){
+					nesting++;
+					current += str[i];
+				} else if(str[i]==="}"){
+					nesting--;
+					current += str[i];
+				} else current += str[i];
+			}
+			if(nesting) throw new Error("Unexpected End of Code"+"'"+str[i]+"':"+i+"\n#"+JSON.stringify(result.slice(-3)));
+			else ++i; // advance past the last }
+			result.push( new Token("code",current) );
+
+		// identifiers
 		} else if(str[i].match(/[A-Za-z_]/)){
 			current = "";
 			while(str[i].match(/[A-Za-z0-9_]/)) current += str[i++];
 			result.push( new Token("identifier",current) );
-		} else if(["=","(",")","|","?","*","+",":",";"].indexOf(str[i])!==-1){
+
+		// operators
+		} else if(operators.indexOf(str[i])!==-1){
 			result.push( new Token("operator",str[i++]) );
-		} else throw new Error("Unknown symbol : "+i+" "+str[i]);
+
+		// unknown
+		} else {
+			throw new Error("Unknown symbol : "+str[i]+" (index:"+i+")");
+		}
+
 	}
 	return new TokenList(result);
 };

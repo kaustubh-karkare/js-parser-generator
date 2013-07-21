@@ -1,8 +1,21 @@
+
+Execution Result
+
 [
-    25,
-    5,
-    [
-        1,
-        42
-    ]
+	20,
+	10,
+	null,
+	null
 ]
+
+
+
+Execution Environment
+
+{
+	"x": 20,
+	"y": 0,
+	"z": 42
+}
+
+

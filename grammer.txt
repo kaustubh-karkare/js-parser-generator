@@ -1,16 +1,72 @@
-block : (list: statement*) ;
-statement
-	: (value: exp1) _ ";"
-	| _ "{" (value: block) _ "}"
+
+{
+	env.toarray = function(data){
+		if(!data) return new Array();
+		else if(!Array.isArray(data)) return new Array(data);
+		else return data;
+	};
+	env.operator = function(left,operator,right){
+		var result = left.eval(), next;
+		operator = env.toarray(operator);
+		right = env.toarray(right);
+		while(operator.length){
+			next = right.shift().eval();
+			switch(operator.shift()){
+				case "+" : result += next; break;
+				case "-" : result -= next; break;
+				case "*" : result *= next; break;
+				case "/" : result /= next; break;
+				case "%" : result %= next; break;
+			}
+		}
+		return result;
+	};
+}
+
+block
+	= sl:(statement*) whitespace*
+		{ return env.toarray(sl).map(function(s){ return s.eval(); }); }
 	;
 
-_ : ( " " | "\t" | "\n" )* ;
+whitespace = " " | "\t" | "\n" ;
+_ = whitespace*? ;
 
-exp1 : (left: exp2) ( _ (operator: "+" | "-" ) (right: exp2) )* ;
-exp2 : (left: exp3) ( _ (operator: "*" | "/" | "%" ) (right: exp3) )* ;
-exp3 : (value: primary) | _ "(" (value: exp1) _ ")";
+statement
+	= _ "if" _ "(" c:expression _ ")" t:statement ( _ "else" e:statement )?
+		{ if(c.eval()) t.eval(); else if(e) e.eval(); }
+	| exp:expression _ ";"
+		{ return exp.eval(); }
+	;
 
-primary : _ (value: variable | integer ) ;
+expression = exp:exp_assign { return exp.eval(); } ;
 
-variable : (string: /[A-Za-z_]\w*/) ;
-integer : (string: /[0-9]+/) ;
+exp_assign
+	= (left:lvalue _ "=")* right:exp_add
+		{
+			left = env.toarray(left);
+			right = right.eval();
+			while(left.length) env[left.pop().eval()] = right;
+			return right;
+		}
+	;
+
+exp_add
+	= left:exp_mul (_ operator:("+"|"-") right:exp_mul)*
+		{ return env.operator(left,operator,right); }
+	;
+
+exp_mul
+	= left:exp_val (_ operator:("*"|"/"|"%") right:exp_val)*
+		{ return env.operator(left,operator,right); }
+	;
+
+exp_val
+	= _ "(" x:expression _ ")" { return x.eval(); }
+	| y:rvalue { return y.eval(); }
+	| z:integer { return z.eval(); }
+	;
+
+rvalue = name:lvalue { return env[name.eval()]; } ;
+lvalue = _ name:/[A-Za-z_]\w*/ { return name; } ;
+
+integer = _ digits:/[0-9]+/ { return parseInt(digits,10); } ;
