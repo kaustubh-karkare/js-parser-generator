@@ -33,13 +33,26 @@ module.exports = {
 		}
 	},
 
-	"regexp" : function(state){
-		this.data.lastIndex = state.index;
-		var t = this.data.exec(state.data);
-		state.log(2,"<regexp/>",this.data.source,state.data.substr(state.index,10));
-		if(t!==null && t.index===state.index){
-			state.index += t[0].length;
-			return t[0];
+	"range" : function(state){
+		var i, m = 0,
+			c = state.data[state.index],
+			cc = !c ? -1 : c.charCodeAt(),
+			cci = !(c && this.ignoreCase) ? -1 :
+				( c===(i=c.toUpperCase()) ? c.toLowerCase() : i ).charCodeAt() ;
+		if(cc!==-1){
+			if(cc===cci) cci = -1;
+			for(i=0; !m && i<this.start.length; ++i)
+				if( this.start[i]<=cc && cc<=this.end[i] ||
+					cci && this.start[i]<=cci && cci<this.end[i] ) m = 1;
+			if(!m)
+				if(	this.individual.indexOf(cc)!==-1 ||
+					cci && this.individual.indexOf(cci)!==-1 )
+					m = 1;
+		}
+		state.log(1,"<range/>",this.regexp,c,m);
+		if(m^this.negative){
+			state.index++;
+			return c;
 		} else {
 			state.mismatch();
 			return null;
@@ -73,7 +86,6 @@ module.exports = {
 		}
 		temp = state.pop().series;
 		state.log(2,1,"</and>",temp);
-		// return temp;
 		return Array.prototype.concat.apply([],temp); // merge subarrays
 	},
 
@@ -105,6 +117,7 @@ module.exports = {
 				else state.top(local);
 			}
 		}
+		throw new Error("Hacky is a Cat.");
 	},
 
 	"loop" : function(state){
@@ -122,6 +135,7 @@ module.exports = {
 			}
 			if(i<this.minimum){
 				state.log(2,"</loop>","mismatch");
+				state.local(null); // consume "null" from state.redirect
 				state.pop();
 				return null;
 			}

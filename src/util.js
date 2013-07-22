@@ -1,5 +1,8 @@
 
 var util = {
+
+	debug : 0,
+
 	clone : function(obj){
 		var result = obj; // null, undefined, number, string, function
 		if(obj instanceof RegExp){ // regexp
@@ -18,9 +21,11 @@ var util = {
 		}
 		return result;
 	},
+
 	equals: function(obj1, obj2){
 		return JSON.stringify(obj1)===JSON.stringify(obj2);
 	}
+	
 };
 
 module.exports = util;

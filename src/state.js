@@ -5,7 +5,6 @@ var State = function(parser,data){
 	this.parser = parser;
 	this.data = data;
 	this.index = 0;
-	this.debug = 0;
 
 	this.localdata = [];
 	this.namedata = [];
@@ -81,7 +80,7 @@ State.prototype.log = function(level){
 			.map(function(x){ return JSON.stringify(x) }),
 		offset = ( !isNaN(parseInt(args[0])) ? parseInt(args.shift()) : 0 ),
 		tab = new Array(this.localdata.length+offset).join("\t");
-	if(this.debug>=level) console.log(tab+args.join(" "));
+	if(util.debug>=level) console.log(tab+args.join(" "));
 };
 
 module.exports = State;

@@ -7,7 +7,7 @@ var build_and = function(tlist, toplevel, labels){
 	var series = [], choice = [], next;
 	var lookahead, label, item, loop, action;
 
-	// [=!]?({code}|label:(string|regexp|identifiers|expression)([?.+][?]?)?{code}) [|);]
+	// [=!]?({code}/label:(string/regexp/identifiers/expression)([?.+][?]?)?{code}) [/);]
 
 	if(!toplevel){
 		if( (next=tlist.peek()) && next.match("operator","(") ) tlist.next();
@@ -34,7 +34,7 @@ var build_and = function(tlist, toplevel, labels){
 		} else label = null;
 
 		if( (next=tlist.peek()) ){
-			if( next.type==="string" || next.type==="regexp" )
+			if( next.type==="string" || next.type==="range" )
 				item = new pattern[next.type](tlist.next().data);
 			else if( next.type==="identifier" )
 				item = new pattern.reference(tlist.next().data);
@@ -68,13 +68,13 @@ var build_and = function(tlist, toplevel, labels){
 		}
 
 		if( (next=tlist.peek()) && next.type==="operator" &&
-			(next.data==="|" || !toplevel && next.data===")" || toplevel && next.data===";") ) {
+			(next.data==="/" || !toplevel && next.data===")" || toplevel && next.data===";") ) {
 			choice.push(series);
-			if(next.data==="|"){ tlist.next(); series = []; }
+			if(next.data==="/"){ tlist.next(); series = []; }
 			else if(next.data===")"){ tlist.next(); break; }
 			else break; // dont consume the semicolon
 		} else if(series[series.length-1] instanceof pattern.action)
-			throw new Error("Expected '|' or '"+(toplevel?";":")")+"'");
+			throw new Error("Expected '/' or '"+(toplevel?";":")")+"'");
 
 	} // while
 

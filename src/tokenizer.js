@@ -37,7 +37,20 @@ var hex = function(str,len){
 	return String.fromCharCode(parseInt(str,16));
 };
 
-var operators = ["=","(",")","|","?","*","+",":",";"];
+var read_str = function(str,i,delimiter){
+	var current = "";
+	do {
+		if(str[i]===undefined) throw new Error("Unexpected End of String");
+		else if(str[i]!=="\\") current += str[i];
+		else if(str[++i] in escapable) current += escapable[str[i]];
+		else if(str[i]==="x") { current += hex(str.substr(++i,2),2); i+=2; }
+		else if(str[i]==="u") { current += hex(str.substr(++i,4),4); i+=4; }
+		else current += str[i];
+	} while(str[++i]!==delimiter);
+	return [current,i];
+};
+
+var operators = ["=","(",")","/","?","*","+",":",";","&","!"];
 
 var tokenize = function(str){
 	var i = 0, result = [], current;
@@ -61,25 +74,19 @@ var tokenize = function(str){
 
 		// strings
 		} else if(str[i]==="\""){
-			current = "";
-			while(str[++i]!=="\"")
-				if(str[i]===undefined) throw new Error("Unexpected End of String");
-				else if(str[i]!=="\\") current += str[i];
-				else if(str[++i] in escapable) current += escapable[str[i]];
-				else if(str[i]==="x"){ current += hex(str.substr(++i,2),2); i+=2; }
-				else if(str[i]==="u"){ current += hex(str.substr(++i,4),4); i+=4; }
-				else current += str[i];
-			result.push( new Token("string",current) );
-			++i;
+			current = read_str(str,++i,"\"");
+			result.push( new Token("string",current[0]) );
+			i = current[1]+1;
 
-		// regular expressions (without flags)
-		} else if(str[i]==="/"){
-			current = "";
-			while(str[++i]!=="/")
-				if(str[i]===undefined) throw new Error("Unexpected End of RegExp");
-				else current += (str[i]==="\\" && str[i+1]==="/" ? str[++i] : str[i]);
-			result.push( new Token("regexp",current) );
-			++i;
+		// character range
+		} else if(str[i]==="["){
+			if(str[i+1]==="^"){ negative = true; ++i; }
+			else negative = false;
+			current = read_str(str,++i,"]");
+			i = current[1]+1;
+			current = current[0]+":"+(str[i]==="i"?str[i++]:"")+(negative?"n":"");
+			result.push( new Token("range",current) );
+			
 
 		// code blocks
 		} else if(str[i]==="{"){
