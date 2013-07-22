@@ -23,26 +23,10 @@ var pattern = {
 
 	"range" : function(data){
 		if(debug) this.type = "range";
-		this.start = [];
-		this.end = [];
-		this.individual = [];
-		var flag = data.slice(data.lastIndexOf(":")+1);
-		data = data.slice(0,-flag.length-1);
-		this.ignoreCase = (flag.indexOf("i")!==-1);
-		this.negative = (flag.indexOf("n")!==-1);
-		for(var i=0,j,k,t; i<data.length; ++i){
-			j = data.charCodeAt(i);
-			if(i+1<data.length && data[i]==="\\" ){
-				j = data.charCodeAt(i+=1);
-				this.individual.push( j );
-			} else if(i+2<data.length && data[i+1]==="-"){
-				k = data.charCodeAt(i+=2);
-				if(j>k){ t=j; j=k; k=t; }
-				this.start.push(j);
-				this.end.push(k);
-			} else this.individual.push( j );
-		}
-		if(debug) this.regexp = "/["+(this.negative?"^":"")+data+"]/"+(this.ignoreCase?"i":"");
+		this.data = data[0];
+		this.ignoreCase = (data[1].indexOf("i")!==-1);
+		this.negative = (data[1].indexOf("n")!==-1);
+		if(debug) this.regexp = "["+this.data+"]"+data[1];
 	},
 
 	"reference": function(name){

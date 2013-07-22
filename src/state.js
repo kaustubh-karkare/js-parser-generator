@@ -34,7 +34,6 @@ State.prototype.save = function(){
 	};
 	this.alternative.push(that);
 	this.log(2,"<alternative>",that.localdata.slice(-1)[0]);
-	return that.localdata.slice(-1)[0];
 };
 
 State.prototype.load = function(){
@@ -44,14 +43,26 @@ State.prototype.load = function(){
 	this.log(2,"<restored>",that.localdata.slice(-1)[0]);
 };
 
+State.prototype.clone = function(){
+	var that = {};
+	for(var key in this)
+		if(Array.isArray(this[key])) that[key] = util.clone(this[key]);
+		else that[key] = this[key];
+	that.__proto__ = this.__proto__; // make this object an instance of the State class
+	return that;
+};
+
 State.prototype.sync = function(that){
-	for(var key in that)
-		this[key] = that[key];
+	for(var key in this)
+		if(Array.isArray(this[key])){
+			// assumption: the lengths of corresponding array elements is equal
+			for(var i=0; i<this[key].length; ++i)
+				if( !util.equals(this[key][i],that[key][i]) )
+					this[key][i] = that[key][i];
+		} else this[key] = that[key];
 };
 
 State.prototype.mismatch = function(){
-	if(this.redirect.length)
-		throw new Error("wtf");
 	if(this.alternative.length===0){
 		for(var i=0; i<this.localdata.length; ++i)
 			this.redirect.push(null);

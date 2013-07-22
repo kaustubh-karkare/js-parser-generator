@@ -2,8 +2,8 @@
 Execution Result
 
 [
-	20,
-	10,
+	25,
+	-10,
 	null,
 	null
 ]
@@ -13,9 +13,9 @@ Execution Result
 Execution Environment
 
 {
-	"x": 20,
+	"x": 25,
 	"y": 0,
-	"z": 42
+	"z": 52
 }
 
 

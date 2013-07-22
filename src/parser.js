@@ -23,8 +23,12 @@ var Parser = function(grammer){
 };
 
 Parser.prototype.parse = function(data){
-	var state = new State(this,data),
-		ast = this.start.match(state);
+	var state = new State(this,data);
+	try {
+		var ast = this.start.match(state);
+	} catch(e) {
+		throw new Error("Syntax Error at index : "+state.index);
+	}
 	if(state.index<data.length)
 		throw new Error("Could not parse beyond index : "+state.index);
 	ast.init = this.init;

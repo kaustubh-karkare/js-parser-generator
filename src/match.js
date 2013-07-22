@@ -34,23 +34,27 @@ module.exports = {
 	},
 
 	"range" : function(state){
-		var i, m = 0,
-			c = state.data[state.index],
-			cc = !c ? -1 : c.charCodeAt(),
-			cci = !(c && this.ignoreCase) ? -1 :
-				( c===(i=c.toUpperCase()) ? c.toLowerCase() : i ).charCodeAt() ;
-		if(cc!==-1){
-			if(cc===cci) cci = -1;
-			for(i=0; !m && i<this.start.length; ++i)
-				if( this.start[i]<=cc && cc<=this.end[i] ||
-					cci && this.start[i]<=cci && cci<this.end[i] ) m = 1;
-			if(!m)
-				if(	this.individual.indexOf(cc)!==-1 ||
-					cci && this.individual.indexOf(cci)!==-1 )
-					m = 1;
+		var found = false, c = state.data[state.index];
+		if(c!==undefined){
+			var ci = (c.toUpperCase()===c ? c.toLowerCase() : c.toUpperCase()),
+				cc = c.charCodeAt(),
+				cci = ci.charCodeAt();
+			for(var i=0,j,k,l; !found && i<this.data.length; ++i){
+				j = i+1<this.data.length && this.data[i]==="\\";
+				k = i+2<this.data.length && this.data[i+1]==="-" && !j;
+				if(k){
+					j = this.data[i].charCodeAt();
+					k = this.data[i+=2].charCodeAt();
+					if(j>k){ l=j; j=k; k=l; }
+					if(j<=cc && cc<=k || this.ignoreCase && j<=cci && cci<=k) found = true;
+				} else {
+					if(j) ++i;
+					if(c===this.data[i] || this.ignoreCase && ci===this.data[i]) found = true;
+				}
+			}
 		}
-		state.log(1,"<range/>",this.regexp,c,m);
-		if(m^this.negative){
+		state.log(1,"<range/>",this.regexp,c,found);
+		if(found^this.negative){
 			state.index++;
 			return c;
 		} else {
@@ -110,10 +114,6 @@ module.exports = {
 					state.pop();
 					return null;
 				}
-				/*
-				The last element of state.localdata needs to be synced with local so that in case of mismatch,
-				the lowest common ancestor of current astnode & last decision point can be correctly identified.
-				*/
 				else state.top(local);
 			}
 		}
@@ -127,7 +127,7 @@ module.exports = {
 
 		if(local.first){
 
-			// Match at least the minimum number of 
+			// Match the pattern at least the minimum number of times.
 			for(i=0; i<this.minimum; ++i){
 				temp = this.pattern.match(state);
 				if(temp!==null) local.list.push(temp);
@@ -135,8 +135,8 @@ module.exports = {
 			}
 			if(i<this.minimum){
 				state.log(2,"</loop>","mismatch");
-				state.local(null); // consume "null" from state.redirect
-				state.pop();
+				state.local(null); // consume "null" from state.redirect. null guaranteed because no decision has been made by this node till now
+				state.pop(); // discard localdata
 				return null;
 			}
 
@@ -150,7 +150,7 @@ module.exports = {
 				k = state.alternative.length - 1;
 
 				for(i=this.minimum; i<this.maximum; ++i){
-					j = util.clone(state);
+					j = state.clone();
 					temp = this.pattern.match(j);
 					if(temp===null) break;
 					state.sync(j);
@@ -178,8 +178,8 @@ module.exports = {
 
 			if(local.first) local.first = false;
 
-			k = util.clone(state);
-			temp = this.pattern.match( k );
+			k = state.clone();
+			temp = this.pattern.match(k);
 			if(temp!==null){
 				i = k.top(); i.list.push(temp); k.top(i);
 				k.save();
