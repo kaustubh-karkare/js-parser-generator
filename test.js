@@ -4,14 +4,14 @@ var fs = require("fs"),
 
 var json = function(x,y){ console.log( "\n"+x+"\n\n"+JSON.stringify(y,null,"	")+"\n\n" ); };
 
-var Parser = require("./src/parser");
+var generator = require("./src/");
 
-var p = new Parser( filedata("grammer.txt") );
-// json("Generated Parser",p);
+var parser = generator.buildParser( filedata("grammar.txt") );
+// json("Generated Parser",parser);
 
-var t = p.parse( filedata("program.txt") );
-// json("Syntax Tree",t);
+var syntaxtree = parser.parse( filedata("program.txt") );
+// json("Syntax Tree",syntaxtree);
 
-var v = t.execute();
-json("Execution Result",v);
-json("Execution Environment",t.env);
+var value = syntaxtree.execute();
+json("Execution Result",value);
+json("Execution Environment",syntaxtree.env);

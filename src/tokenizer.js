@@ -1,8 +1,4 @@
 
-// The following classes are used during the lexical analysis of the language grammer.
-
-var escapable = { "f":"\f", "n":"\n", "r":"\n", "t":"\t", "v":"\v", "\"":"\"" };
-
 var Token = function(type,data){
 	this.type = type;
 	this.data = data;
@@ -38,6 +34,10 @@ var hex_char = function(str,len){
 			throw new Error("Unexpected Symbol in String");
 	return String.fromCharCode(parseInt(str,16));
 };
+
+
+
+var escapable = { "f":"\f", "n":"\n", "r":"\n", "t":"\t", "v":"\v", "\"":"\"" };
 
 var read_str = function(str,i,delimiter){
 	var current = "";

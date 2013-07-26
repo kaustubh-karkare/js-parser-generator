@@ -6,9 +6,10 @@ var pattern = {
 
 	// Root Node
 
-	"production" : function(name, pattern){
+	"production" : function(name, altname, pattern){
 		if(debug) this.type = "production";
 		this.name = name;
+		this.altname = altname;
 		this.pattern = pattern;
 	},
 
@@ -26,7 +27,7 @@ var pattern = {
 		this.data = data[0];
 		this.ignoreCase = (data[1].indexOf("i")!==-1);
 		this.negative = (data[1].indexOf("n")!==-1);
-		if(debug) this.regexp = "["+this.data+"]"+data[1];
+		if(debug) this.display = "["+(this.negative?"^":"")+this.data+"]"+(this.ignoreCase?"i":"");
 	},
 
 	"reference": function(name){
@@ -46,10 +47,9 @@ var pattern = {
 		this.options = options;
 	},
 
-	"loop" : function(pattern, minimum, maximum, greedy){
+	"loop" : function(pattern, maximum, greedy){
 		if(debug) this.type = "loop";
 		this.pattern = pattern;
-		this.minimum = minimum;
 		this.maximum = maximum;
 		this.greedy = greedy;
 	},

@@ -5,9 +5,9 @@ var build_and = function(tlist, toplevel, labels){
 	labels = labels || [];
 
 	var series = [], choice = [], next;
-	var lookahead, label, item, loop, action;
+	var lookahead, label, item, loop, greedy, action;
 
-	// [=!]?({code}/label:(string/regexp/identifiers/expression)([?.+][?]?)?{code}) [/);]
+	// [(] [=!]?({code}/label:(string/range/identifiers/expression)([?.+][?]?)?{code}) [)/;]
 
 	if(!toplevel){
 		if( (next=tlist.peek()) && next.match("operator","(") ) tlist.next();
@@ -16,6 +16,23 @@ var build_and = function(tlist, toplevel, labels){
 
 	while(tlist.peek()){
 
+		// Loop Termination
+		if( (next=tlist.peek()) && next.type==="operator" &&
+			(next.data==="/" || !toplevel && next.data===")" || toplevel && next.data===";") ) {
+			choice.push(series);
+			tlist.next();
+			if(next.data==="/") series = [];
+			else break; // if ) or ;
+		}
+
+		// If the next few tokens are the start of the next production, break loop
+		if( tlist.peek().type==="identifier" && (
+			tlist.peek(2) && tlist.peek(2).match("operator","=") ||
+			tlist.peek(3) && tlist.peek(2).type==="string" && tlist.peek(3).match("operator","=")) ){
+			choice.push(series);
+			break;
+		}
+
 		lookahead = 0;
 		if( (next=tlist.peek()) && next.type==="operator" ){
 			if(next.data==="&") lookahead = 1;
@@ -23,16 +40,21 @@ var build_and = function(tlist, toplevel, labels){
 			if(lookahead) tlist.next();
 		}
 
+		// Predicate
 		if(lookahead && (next=tlist.peek()) && next.type==="code"){
 			series.push( new pattern.predicate(tlist.next().data) );
 			continue;
 		}
 
+		// Label
 		if( tlist.peek(2) && tlist.peek().type==="identifier" && tlist.peek(2).match("operator",":") ){
 			labels.push( label = tlist.next().data );
+			if(label==="this" || label==="callback")
+				throw new Error("Reserved : Cannot use \""+label+"\" as a label.");
 			tlist.next();
 		} else label = null;
 
+		// Pattern
 		if( (next=tlist.peek()) ){
 			if( next.type==="string" || next.type==="range" )
 				item = new pattern[next.type](tlist.next().data);
@@ -50,31 +72,28 @@ var build_and = function(tlist, toplevel, labels){
 			else if(next.data==="+") loop = 3;
 			if(loop) tlist.next();
 		}
+		greedy = 1;
 		if( loop && (next=tlist.peek()) && next.match("operator","?") ){
-			loop += 10;
+			greedy = 0;
 			tlist.next();
 		}
 
-		if(loop) item = new pattern.loop(item, loop%10===3?1:0, loop%10===1?1:9999, loop>10?false:true );
+		if(loop===1) item = new pattern.or( greedy ? [item,new pattern.empty()] : [new pattern.empty(),item] );
+		else if(loop===2) item = new pattern.loop(item,9999,greedy);
+		else if(loop===3) item = new pattern.and([ item, new pattern.loop(item,9999,greedy) ]);
+
+		// Wrap & Insert
 		if(label) item = new pattern.label(label, item);
 		if(lookahead) item = new pattern.lookahead( lookahead===1?true:false, item );
 		series.push(item);
 
+		// Action
 		if( (next=tlist.peek()) && next.type==="code" ){
 			series = ( series.length===0 ? new pattern.empty() :
 				series.length===1 ? series[0] : new pattern.and(series) );
 			series = [new pattern.action( series, tlist.next().data, labels )];
 			labels = [];
 		}
-
-		if( (next=tlist.peek()) && next.type==="operator" &&
-			(next.data==="/" || !toplevel && next.data===")" || toplevel && next.data===";") ) {
-			choice.push(series);
-			if(next.data==="/"){ tlist.next(); series = []; }
-			else if(next.data===")"){ tlist.next(); break; }
-			else break; // dont consume the semicolon
-		} else if(series[series.length-1] instanceof pattern.action)
-			throw new Error("Expected '/' or '"+(toplevel?";":")")+"'");
 
 	} // while
 
@@ -88,21 +107,21 @@ var build_and = function(tlist, toplevel, labels){
 };
 
 var build_production = function(tlist){
-	var next, name, item;
+	var next, name, altname = null, item;
 
 	if( (next=tlist.next())===null || next.type!=="identifier")
 		throw new Error("Expected Production Name");
 	else name = next.data;
+
+	if( tlist.peek() && next.type==="string")
+		altname = tlist.next().data;
 
 	if( (next=tlist.next())===null || !next.match("operator","="))
 		throw new Error("Expected '='");
 
 	item = build_and(tlist, true);
 
-	if( (next=tlist.next())===null || !next.match("operator",";") )
-		throw new Error("Expected ';'");
-
-	return new pattern.production(name,item);
+	return new pattern.production(name,altname,item);
 };
 
 module.exports = {

@@ -1,6 +1,5 @@
 
-var ast = require("./ast"),
-	util = require("./util");
+var ast = require("./ast");
 
 module.exports = {
 
@@ -18,19 +17,15 @@ module.exports = {
 	// Leaf Nodes
 
 	"empty" : function(state){
-		return "";
+		state.log(2,"<empty/>");
+		return state.match("");
 	},
 
 	"string" : function(state){
 		var t = state.data.substr(state.index,this.data.length);
 		state.log(2,"<string/>",this.data,t);
-		if(this.data===t){
-			state.index += t.length;
-			return t;
-		} else {
-			state.mismatch();
-			return null;
-		}
+		if(this.data===t) return state.match(t);
+		else return state.mismatch(this.data);
 	},
 
 	"range" : function(state){
@@ -53,14 +48,9 @@ module.exports = {
 				}
 			}
 		}
-		state.log(1,"<range/>",this.regexp,c,found);
-		if(found^this.negative){
-			state.index++;
-			return c;
-		} else {
-			state.mismatch();
-			return null;
-		}
+		state.log(2,"<range/>",this.display,c,found^this.negative);
+		if(found^this.negative) return state.match(c);
+		else return state.mismatch(this.display);
 	},
 
 	"reference" : function(state){
@@ -85,7 +75,8 @@ module.exports = {
 					state.log(2,"</and>","mismatch");
 					state.pop();
 					return null;
-				} else state.top(local);
+				}
+				else state.top(local);
 			}
 		}
 		temp = state.pop().series;
@@ -100,8 +91,11 @@ module.exports = {
 			state.log(2,"<or>",this.options,local.choice);
 
 			// save next alternative & match current option
-			if(++local.choice < this.options.length) state.save();
-			temp = this.options[--local.choice].match(state);
+			if(state.redirect.length===0){
+				if(++local.choice < this.options.length) state.save();
+				--local.choice;
+			}
+			temp = this.options[local.choice].match(state);
 
 			if(temp!==null){
 				state.log(2,"</or>",temp);
@@ -117,80 +111,39 @@ module.exports = {
 				else state.top(local);
 			}
 		}
-		throw new Error("Hacky is a Cat.");
+		throw new Error("The cats are plotting world domination.");
 	},
 
 	"loop" : function(state){
-		var local = state.push(state.local({ first:true, list:[] }));
-		var i,j,k,temp;
-		state.log(2,"<loop>",this.pattern,this.minimum,this.maximum,this.greedy,local.list);
-
-		if(local.first){
-
-			// Match the pattern at least the minimum number of times.
-			for(i=0; i<this.minimum; ++i){
-				temp = this.pattern.match(state);
-				if(temp!==null) local.list.push(temp);
-				else break;
-			}
-			if(i<this.minimum){
-				state.log(2,"</loop>","mismatch");
-				state.local(null); // consume "null" from state.redirect. null guaranteed because no decision has been made by this node till now
-				state.pop(); // discard localdata
-				return null;
-			}
-
-		}
-
+		var local = state.push(state.local({ list:[], next:this.greedy }));
+		var temp, k;
 		if(this.greedy){
-
-			if(local.first){
-
-				state.save();
-				k = state.alternative.length - 1;
-
-				for(i=this.minimum; i<this.maximum; ++i){
-					j = state.clone();
-					temp = this.pattern.match(j);
-					if(temp===null) break;
-					state.sync(j);
-					local = state.top();
-					local.list.push(temp);
+			while(local.next && local.list.length < this.maximum){
+				state.log(2,"<loop>",this.pattern,this.maximum,this.greedy,local);
+				if(state.redirect.length===0){
+					// save the decision to do one thing
+					local.next = false;
+					state.save();
+					local.next = true;
 				}
-				
-				if(local.list.length===this.minimum){
-					state.alternative.splice(k,1);
-				} else {
-					temp = state.alternative[k].localdata;
-					temp[temp.length-1].first = false;
-					temp[temp.length-1].list = local.list.slice(0,-1);
-				}
-
-			} else {
-
-				temp = local.list.pop();
-				if(local.list.length>this.minimum) state.save();
-				local.list.push(temp);
-
+				// then do the opposite
+				temp = this.pattern.match(state);
+				if(temp===null) local = state.local(local);
+				else local.list.push(temp);
 			}
-
 		} else { // if not greedy
-
-			if(local.first) local.first = false;
-
-			k = state.clone();
-			temp = this.pattern.match(k);
-			if(temp!==null){
-				i = k.top(); i.list.push(temp); k.top(i);
-				k.save();
-				state.alternative.push( k.alternative.pop() );
+			if(local.list.length<this.maximum){
+				temp = this.pattern.match( clone = state.clone() );
+				if(temp!==null){
+					clone.top().list.push(temp);
+					clone.save();
+					state.alternative.push( clone.alternative.pop() );
+				}
 			}
-
 		}
-
 		temp = state.pop().list;
 		state.log(2,1,"</loop>",temp);
-		return Array.prototype.concat.apply([],temp); // merge subarrays
+		return Array.prototype.concat.apply([],temp);
 	},
 
 	"lookahead" : function(state){
@@ -207,7 +160,7 @@ module.exports = {
 	"label" : function(state){
 		state.log(2,"<label>",this.name);
 		var temp = this.pattern.match(state);
-		var last = state.namedata[state.namedata.length-1] || {};
+		var last = state.namedata[state.namedata.length-1];
 		state.log(2,"</label>",this.name,temp);
 		if(temp) last[this.name] = (last[this.name] || []).concat(temp);
 		return temp;

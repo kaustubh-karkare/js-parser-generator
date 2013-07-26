@@ -1,14 +1,14 @@
 
+var debug = require("./util").debug;
+
 var generate = function(labels,code){
-	var result = "(function(){\nvar env = this.env";
-	for(var i=0; i<labels.length; ++i)
-		result+=", "+labels[i]+" = this.data."+labels[i];
-	result += ";\n" + code + "\n})";
-	return eval(result);
+	var result = "return (function(" + labels.join(",") + ")" + code +
+		").apply(this.env,[" + labels.map(function(x){ return "this.data."+x; }).join(",") + "]);";
+	return eval("(function(){"+result+"})");
 };
 
 var ast = function(labels,data,code){
-	// this.type = "astnode";
+	if(debug) this.type = "astnode";
 	this.data = data;
 	// this.code = code;
 	this.eval = generate(labels, code);
@@ -34,10 +34,14 @@ ast.prototype.execute = function(env){
 	if(this.init===undefined) throw new Error("Invalid Operation");
 	// Create Execution Environment (accessible from all nodes)
 	this.setenv(env = env || {});
-	// Initialize Execution Environment
-	eval(this.init);
+	// Execution Environment Constructor
+	eval("(function(){"+this.init+"})").apply(env);
 	// Start Actual Execution
-	return this.eval();
+	this.result = this.eval();
+	// Execution Environment Destructor
+	if(typeof(env.destructor)==="function")
+		env.destructor.apply(env);
+	return this.result;
 };
 
 module.exports = ast;
