@@ -10,7 +10,8 @@ var Parser = function(grammar){
 
 	var tlist = tokenize(grammar);
 	if(tlist.peek() && tlist.peek().type==="code")
-		this.init = tlist.next().data;
+		this.init = eval("(function(){" + tlist.next().data +
+			"return function(code){ return eval(code); }; })");
 
 	var p;
 	while(tlist.peek()){
@@ -24,15 +25,17 @@ var Parser = function(grammar){
 
 Parser.prototype.parse = function(data){
 	var state = new State(this,data);
-	try {
-		var ast = this.start.match(state);
-	} catch(e) {
+	// Set Up Execution Environment
+	state.env = this.init();
+	// Syntactically analyze the given data
+	try { var ast = this.start.match(state); }
+	catch(e) {
 		// console.log("\nExpected:",state.expected);
 		throw new Error("Syntax Error at index : "+state.index+"\n"+e.stack);
 	}
 	if(state.index<data.length)
 		throw new Error("Could not parse beyond index : "+state.index);
-	ast.init = this.init;
+	ast.root = true;
 	return ast;
 };
 

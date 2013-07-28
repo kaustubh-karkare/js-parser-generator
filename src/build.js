@@ -33,6 +33,15 @@ var build_and = function(tlist, toplevel, labels){
 			break;
 		}
 
+		// Action
+		if( (next=tlist.peek()) && next.type==="code" ){
+			series = ( series.length===0 ? new pattern.empty() :
+				series.length===1 ? series[0] : new pattern.and(series) );
+			series = [new pattern.action( series, tlist.next().data, labels )];
+			labels = [];
+			continue;
+		}
+
 		lookahead = 0;
 		if( (next=tlist.peek()) && next.type==="operator" ){
 			if(next.data==="&") lookahead = 1;
@@ -42,14 +51,17 @@ var build_and = function(tlist, toplevel, labels){
 
 		// Predicate
 		if(lookahead && (next=tlist.peek()) && next.type==="code"){
-			series.push( new pattern.predicate(tlist.next().data) );
+			// series.push( new pattern.predicate(tlist.next().data) );
+			item = series.length===0 ? new pattern.empty() :
+				series.length===1 ? series[0] : new pattern.and(series);
+			series = [ new pattern.predicate(lookahead===1,item,tlist.next().data,labels) ];
 			continue;
 		}
 
 		// Label
 		if( tlist.peek(2) && tlist.peek().type==="identifier" && tlist.peek(2).match("operator",":") ){
 			labels.push( label = tlist.next().data );
-			if(label==="this" || label==="callback")
+			if(label==="this" || label==="args")
 				throw new Error("Reserved : Cannot use \""+label+"\" as a label.");
 			tlist.next();
 		} else label = null;
@@ -86,14 +98,6 @@ var build_and = function(tlist, toplevel, labels){
 		if(label) item = new pattern.label(label, item);
 		if(lookahead) item = new pattern.lookahead( lookahead===1?true:false, item );
 		series.push(item);
-
-		// Action
-		if( (next=tlist.peek()) && next.type==="code" ){
-			series = ( series.length===0 ? new pattern.empty() :
-				series.length===1 ? series[0] : new pattern.and(series) );
-			series = [new pattern.action( series, tlist.next().data, labels )];
-			labels = [];
-		}
 
 	} // while
 

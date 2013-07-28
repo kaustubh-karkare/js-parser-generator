@@ -7,9 +7,9 @@ module.exports = {
 
 	"production" : function(state){
 		state.log(1,"<production>",this.name);
-		state.namedata.push({});
+		state.predicate.push(null);
 		var temp = this.pattern.match(state);
-		state.namedata.pop();
+		state.predicate.pop();
 		state.log(1,"</production>", this.name, temp);
 		return temp;
 	},
@@ -25,7 +25,10 @@ module.exports = {
 		var t = state.data.substr(state.index,this.data.length);
 		state.log(2,"<string/>",this.data,t);
 		if(this.data===t) return state.match(t);
-		else return state.mismatch(this.data);
+		else {
+			state.mismatch(this.data);
+			return state.local(); // null
+		}
 	},
 
 	"range" : function(state){
@@ -50,7 +53,10 @@ module.exports = {
 		}
 		state.log(2,"<range/>",this.display,c,found^this.negative);
 		if(found^this.negative) return state.match(c);
-		else return state.mismatch(this.display);
+		else {
+			state.mismatch(this.display);
+			return state.local(); // null
+		}
 	},
 
 	"reference" : function(state){
@@ -81,7 +87,7 @@ module.exports = {
 		}
 		temp = state.pop().series;
 		state.log(2,1,"</and>",temp);
-		return Array.prototype.concat.apply([],temp); // merge subarrays
+		return temp;
 	},
 
 	"or" : function(state){
@@ -143,7 +149,7 @@ module.exports = {
 		}
 		temp = state.pop().list;
 		state.log(2,1,"</loop>",temp);
-		return Array.prototype.concat.apply([],temp);
+		return temp;
 	},
 
 	"lookahead" : function(state){
@@ -160,34 +166,82 @@ module.exports = {
 	"label" : function(state){
 		state.log(2,"<label>",this.name);
 		var temp = this.pattern.match(state);
-		var last = state.namedata[state.namedata.length-1];
+		if(temp){
+			// provide data to nearest action
+			var last = state.namedata[state.namedata.length-1];
+			last[this.name].push(temp);
+			// provide data to nearest predicate
+			last = state.predicate[state.predicate.length-1];
+			if(last) last[this.name].push(temp);
+		}
 		state.log(2,"</label>",this.name,temp);
-		if(temp) last[this.name] = (last[this.name] || []).concat(temp);
 		return temp;
 	},
 
 	"action" : function(state){
 		state.log(2,"<action>");
-		state.namedata.push({});
+		// prepare the data object and match
+		var data = {};
+		for(var i=0; i<this.labels.length; ++i)
+			data[this.labels[i]] = [];
+		state.namedata.push(data);
 		var temp = this.pattern.match(state);
-		var data = state.namedata.pop();  // data can be undefined if names are specified outside actions
+		data = state.namedata.pop(); // data can be undefined if names are specified outside actions
 		if(temp){
+			// remove unnecessary array wrappers
 			for(var key in data)
 				if(data[key].length===0) delete data[key];
 				else if(data[key].length===1) data[key] = data[key][0];
-			temp = new ast( this.labels , data || {} , this.code );
+			var node = new ast( this.labels , data || {} , state.env, this.code );
+			// save string data only if a predicate node is an ancestor
+			if(state.predicate.filter(function(p){ return !!p; }).length>0)
+				node.str = stronly(temp);
+			temp = node;
 		}
 		state.log(2,"</action>",temp);
 		return temp;
 	},
 
 	"predicate" : function(state){
-		state.log(2,"<predicate>");
-		// state.namedata.push({});
-		var temp = this.pattern.match(state);
-		// var data = state.namedata.pop();
-		state.log(2,"</predicate>");
-		return temp;
+		var temp, data, result;
+		state.log(2,"<predicate>",this.labels);
+		while(true){
+			// prepare the data object
+			data = {};
+			for(var i=0; i<this.labels.length; ++i)
+				data[this.labels[i]] = [];
+			// process pattern
+			state.predicate.push(data);
+			temp = this.pattern.match(state);
+			data = state.predicate.pop();
+			if(temp===null) return null;
+			// remove unnecessary array wrappers & replace ast nodes
+			for(var key in data)
+				if(data[key].length===0) delete data[key];
+				else if(data[key].length===1) data[key] = data[key][0];
+			data = stronly(data);
+			// run predicate code
+			result = this.positive === !!state.env("(function(" + this.labels.join(",") + ")" +
+				this.code + ")").apply( null, this.labels.map(function(x){ return data[x]; }) );
+			if(result){
+				state.log(2,"</predicate>",data);
+				return temp;
+			} else {
+				state.mismatch(this);
+				if(state.redirect[0]===null) return state.local();
+			}
+		}
 	}
 
+};
+
+var stronly = function(data){
+	if(typeof(data)==="string") return data;
+	else if(data instanceof ast) return data.str;
+	else if(Array.isArray(data)) return data.map(arguments.callee);
+	else if(typeof(data)==="object" && data!==null){
+		var result = {};
+		for(var key in data) result[key] = arguments.callee(data[key]);
+		return result;
+	}
 };

@@ -76,14 +76,14 @@ var read_code = function(str,i){
 		// single line comments
 		if(str.substr(i,2)==="//"){
 			i+=2;
-			while(str[++i] && str[i]!=="\n") current+=str[i];
-			current+=str[++i];
+			while(str[++i] && str[i]!=="\n");
+			i+=1;
 
 		// multi line comments
 		} else if(str.substr(i,2)==="/*"){
 			i+=2;
 			while(str[++i] && str.substr(i,2)!=="*/");
-			current+="*/"; i+=2;
+			i+=2;
 
 		// string & regexp
 		} else if(str[i]==="\"" ||
@@ -108,7 +108,7 @@ var read_code = function(str,i){
 
 		// everything else
 		} else {
-			current += str[i];
+			if(str[i]!=="\n" && str[i]!=="\r") current += str[i];
 			if(whitespace.indexOf(str[i])===-1) lastchar = str[i];
 		}
 

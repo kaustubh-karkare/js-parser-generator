@@ -75,10 +75,12 @@ var pattern = {
 		this.labels = labels;
 	},
 
-	"predicate" : function(pattern,code){
+	"predicate" : function(positive,pattern,code,labels){
 		if(debug) this.type = "predicate";
+		this.positive = positive;
 		this.pattern = pattern;
 		this.code = code;
+		this.labels = labels;
 	}
 
 };

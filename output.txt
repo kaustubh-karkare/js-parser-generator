@@ -5,18 +5,9 @@ Execution Result
 	1,
 	null,
 	0,
-	null
+	null,
+	7,
+	2
 ]
-
-
-
-Execution Environment
-
-{
-	"data": {
-		"x": 7,
-		"y": 2
-	}
-}
 
 

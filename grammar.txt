@@ -1,14 +1,14 @@
 
 {
-	this.toarray = function(data){
+	var toarray = function(data){
 		if(!data) return new Array();
 		else if(!Array.isArray(data)) return new Array(data);
 		else return data;
 	};
-	this.operator = function(left,operator,right){
+	var operate = function(left,operator,right){
 		var result = left.eval(), next;
-		operator = this.toarray(operator);
-		right = this.toarray(right);
+		operator = toarray(operator);
+		right = toarray(right);
 		while(operator.length){
 			next = right.shift().eval();
 			switch(operator.shift()){
@@ -32,12 +32,12 @@
 		}
 		return result;
 	};
-	this.data = {};
+	var data = {};
 }
 
 program
 	= _ sl:(statement)* _
-		{ return this.toarray(sl).map(function(s){ return s.eval(); }); }
+		{ return toarray(sl).map(function(s){ return s.eval(); }); }
 
 whitespace
 	= [ \t\n]
@@ -47,10 +47,10 @@ whitespace
 _ = whitespace*
 
 statement
-	= "{" _ list:statement* "}"
-		{ this.toarray(list).forEach(function(s){ s.eval(); }); }
+	= "{" _ list:statement* "}" _
+		{ toarray(list).forEach(function(s){ return s.eval(); }); }
 	/ "if" _ "(" _ c:expression ")" _ t:statement ( "else" _ e:statement )?
-		{ if(c.eval()) t.eval(); else if(e) e.eval(); }
+		{ c.eval() ? t.eval() : e && e.eval(); }
 	/ "while" _ "(" _ c:expression ")" _ t:statement
 		{ while(c.eval()) t.eval(); }
 	/ "repeat" _ "(" _ c:expression ")" _ t:statement
@@ -61,35 +61,35 @@ statement
 expression = exp:exp_assign { return exp.eval(); } ;
 
 exp_assign
-	= (left:lvalue "=" _)* right:exp_ternary
+	= (left:lvalue eq:"=" _)* right:exp_ternary
 		{
-			left = this.toarray(left);
+			left = toarray(left);
 			right = right.eval();
-			while(left.length) this.data[left.pop().eval()] = right;
+			while(left.length) data[left.pop().eval()] = right;
 			return right;
 		}
 
 exp_ternary = c:exp_lor ("?" _ t:exp_assign _ ":" _ e:exp_assign)? { return t ? ( c.eval() ? t.eval() : e.eval() ) : c.eval(); } ;
 
-exp_lor = left:exp_land (operator:"||" _ right:exp_land)* { return this.operator(left,operator,right); } ;
-exp_land = left:exp_bor (operator:"&&" _ right:exp_bor)* { return this.operator(left,operator,right); } ;
+exp_lor = left:exp_land (operator:"||" _ right:exp_land)* { return operate(left,operator,right); } ;
+exp_land = left:exp_bor (operator:"&&" _ right:exp_bor)* { return operate(left,operator,right); } ;
 
-exp_bor = left:exp_bxor (operator:"|" _ right:exp_bxor)* { return this.operator(left,operator,right); } ;
-exp_bxor = left:exp_band (operator:"^" _ right:exp_band)* { return this.operator(left,operator,right); } ;
-exp_band = left:exp_eql (operator:"&" _ right:exp_eql)* { return this.operator(left,operator,right); } ;
+exp_bor = left:exp_bxor (operator:"|" _ right:exp_bxor)* { return operate(left,operator,right); } ;
+exp_bxor = left:exp_band (operator:"^" _ right:exp_band)* { return operate(left,operator,right); } ;
+exp_band = left:exp_eql (operator:"&" _ right:exp_eql)* { return operate(left,operator,right); } ;
 
-exp_eql = left:exp_cmp (operator:("=="/"!=") _ right:exp_cmp)* { return this.operator(left,operator,right); } ;
-exp_cmp = left:exp_add (operator:("<"/">"/"<="/">=") _ right:exp_add)* { return this.operator(left,operator,right); } ;
+exp_eql = left:exp_cmp (operator:("=="/"!=") _ right:exp_cmp)* { return operate(left,operator,right); } ;
+exp_cmp = left:exp_add (operator:("<"/">"/"<="/">=") _ right:exp_add)* { return operate(left,operator,right); } ;
 
-exp_add = left:exp_mul (operator:[+-] _ right:exp_mul)* { return this.operator(left,operator,right); } ;
-exp_mul = left:exp_val (operator:[*/%] _ right:exp_val)* { return this.operator(left,operator,right); } ;
+exp_add = left:exp_mul (operator:[+-] _ right:exp_mul)* { return operate(left,operator,right); } ;
+exp_mul = left:exp_val (operator:[*/%] _ right:exp_val)* { return operate(left,operator,right); } ;
 
 exp_val
 	= "(" _ x:exp_assign _ ")" _ { return x.eval(); }
 	/ y:rvalue { return y.eval(); }
 	/ z:integer { return z.eval(); }
 
-rvalue = name:lvalue { return this.data[name.eval()]; } ;
-lvalue = name:([A-Za-z_][A-Za-z0-9_]*) _ { return this.toarray(name).join(""); } ;
+rvalue = name:lvalue { return data[name.eval()] || 0; } ;
+lvalue = name:([A-Za-z_][A-Za-z0-9_]*) _ { return toarray(name).join(""); } ;
 
-integer = digits:[+-]? _ digits:[0-9]+ _ { return parseInt(this.toarray(digits).join(""),10); } ;
+integer = digits:[+-]? _ digits:[0-9]+ _ { return parseInt(toarray(digits).join(""),10); } ;

@@ -14,4 +14,3 @@ var syntaxtree = parser.parse( filedata("program.txt") );
 
 var value = syntaxtree.execute();
 json("Execution Result",value);
-json("Execution Environment",syntaxtree.env);

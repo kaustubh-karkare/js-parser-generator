@@ -5,9 +5,11 @@ var State = function(parser,data){
 	this.parser = parser;
 	this.data = data;
 	this.index = 0;
+	this.env = {};
 
 	this.localdata = [];
 	this.namedata = [];
+	this.predicate = [];
 	this.alternative = [];
 	this.redirect = [];
 	// this.expected = [];
@@ -31,7 +33,8 @@ State.prototype.save = function(){
 	var that = {
 		"localdata" : util.clone(this.localdata),
 		"index" : this.index,
-		"namedata" : util.clone(this.namedata)
+		"namedata" : util.clone(this.namedata),
+		"predicate" : util.clone(this.predicate),
 	};
 	this.alternative.push(that);
 	this.log(2,"<alternative>",that.localdata.slice(-1)[0]);
@@ -43,6 +46,7 @@ State.prototype.load = function(){
 	// localdata not loaded, as this is set during redirection itself
 	this.index = that.index;
 	this.namedata = that.namedata;
+	this.predicate = that.predicate;
 	this.log(2,1,"<restored>",that.localdata.slice(-1)[0]);
 };
 
@@ -55,6 +59,7 @@ State.prototype.clone = function(){
 	return that;
 };
 
+/*
 State.prototype.diff = function(that){
 	var result = {};
 	for(var key in this)
@@ -97,6 +102,7 @@ State.prototype.sub = function(diff){
 		}
 	this.index -= diff.index;
 };
+*/
 
 State.prototype.match = function(unit){
 	this.index += unit.length;
@@ -113,12 +119,12 @@ State.prototype.mismatch = function(unit){
 		var that = this.alternative[this.alternative.length-1];
 		for(var i=0; i<this.localdata.length; ++i)
 			if(!util.equals(this.localdata[i],that.localdata[i])) break;
-		for(var j=i+1; j<this.localdata.length; ++j) this.redirect.push(null);
+		for(var j=i; j<this.localdata.length; ++j) this.redirect.push(null);
 		this.redirect = this.redirect.concat(that.localdata.slice(i));
-		this.log(2,"<mismatch>",this.redirect,this.localdata,that.localdata);
+		this.log(2,"<mismatch>",this.redirect,i,this.localdata,that.localdata);
 		if(this.redirect.length===0) this.load(); // delayed so that it can be ignored midway
 	}
-	return null;
+	// return this.local();
 };
 
 State.prototype.local = function(initial){
