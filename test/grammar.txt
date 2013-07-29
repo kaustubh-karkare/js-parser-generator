@@ -1,16 +1,12 @@
 
 {
-	var toarray = function(data){
-		if(!data) return new Array();
-		else if(!Array.isArray(data)) return new Array(data);
-		else return data;
-	};
+	var toarray = function(a){ return Array.isArray(a) ? a : ( a ? [a] : [] ); };
 	var operate = function(left,operator,right){
-		var result = left.eval(), next;
+		var result = left(), next;
 		operator = toarray(operator);
 		right = toarray(right);
 		while(operator.length){
-			next = right.shift().eval();
+			next = right.shift()();
 			switch(operator.shift()){
 				case "+" : result += next; break;
 				case "-" : result -= next; break;
@@ -36,8 +32,9 @@
 }
 
 program
-	= _ sl:(statement)* _
-		{ return toarray(sl).map(function(s){ return s.eval(); }); }
+	= _ sl:statement* _
+		{ return toarray(sl).map(function(s){ return s(); }); }
+	;
 
 whitespace
 	= [ \t\n]
@@ -48,28 +45,28 @@ _ = whitespace*
 
 statement
 	= "{" _ list:statement* "}" _
-		{ toarray(list).forEach(function(s){ return s.eval(); }); }
+		{ toarray(list).forEach(function(s){ return s(); }); }
 	/ "if" _ "(" _ c:expression ")" _ t:statement ( "else" _ e:statement )?
-		{ c.eval() ? t.eval() : e && e.eval(); }
+		{ c() ? t() : e && e(); }
 	/ "while" _ "(" _ c:expression ")" _ t:statement
-		{ while(c.eval()) t.eval(); }
+		{ while(c()) t(); }
 	/ "repeat" _ "(" _ c:expression ")" _ t:statement
-		{ for(var i=0, j=c.eval(); i<j; ++i) t.eval(); }
+		{ for(var i=0, j=c(); i<j; ++i) t(); }
 	/ exp:expression ";" _
-		{ return exp.eval(); }
+		{ return exp(); }
 
-expression = exp:exp_assign { return exp.eval(); } ;
+expression = exp:exp_assign { return exp(); } ;
 
 exp_assign
 	= (left:lvalue eq:"=" _)* right:exp_ternary
 		{
 			left = toarray(left);
-			right = right.eval();
-			while(left.length) data[left.pop().eval()] = right;
+			right = right();
+			while(left.length) data[left.pop()()] = right;
 			return right;
 		}
 
-exp_ternary = c:exp_lor ("?" _ t:exp_assign _ ":" _ e:exp_assign)? { return t ? ( c.eval() ? t.eval() : e.eval() ) : c.eval(); } ;
+exp_ternary = c:exp_lor ("?" _ t:exp_assign _ ":" _ e:exp_assign)? { return t ? ( c() ? t() : e() ) : c(); } ;
 
 exp_lor = left:exp_land (operator:"||" _ right:exp_land)* { return operate(left,operator,right); } ;
 exp_land = left:exp_bor (operator:"&&" _ right:exp_bor)* { return operate(left,operator,right); } ;
@@ -85,11 +82,11 @@ exp_add = left:exp_mul (operator:[+-] _ right:exp_mul)* { return operate(left,op
 exp_mul = left:exp_val (operator:[*/%] _ right:exp_val)* { return operate(left,operator,right); } ;
 
 exp_val
-	= "(" _ x:exp_assign _ ")" _ { return x.eval(); }
-	/ y:rvalue { return y.eval(); }
-	/ z:integer { return z.eval(); }
+	= "(" _ x:exp_assign _ ")" _ { return x(); }
+	/ y:rvalue { return y(); }
+	/ z:integer { return z(); }
 
-rvalue = name:lvalue { return data[name.eval()] || 0; } ;
+rvalue = name:lvalue { return data[name()] || 0; } ;
 lvalue = name:([A-Za-z_][A-Za-z0-9_]*) _ { return toarray(name).join(""); } ;
 
 integer = digits:[+-]? _ digits:[0-9]+ _ { return parseInt(toarray(digits).join(""),10); } ;

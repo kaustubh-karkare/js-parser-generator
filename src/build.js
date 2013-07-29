@@ -14,7 +14,7 @@ var build_and = function(tlist, toplevel, labels){
 		else throw new Error("Expected '('" +" "+JSON.stringify(next) );
 	}
 
-	while(tlist.peek()){
+	while(true){
 
 		// Loop Termination
 		if( (next=tlist.peek()) && next.type==="operator" &&
@@ -25,10 +25,14 @@ var build_and = function(tlist, toplevel, labels){
 			else break; // if ) or ;
 		}
 
-		// If the next few tokens are the start of the next production, break loop
-		if( tlist.peek().type==="identifier" && (
-			tlist.peek(2) && tlist.peek(2).match("operator","=") ||
-			tlist.peek(3) && tlist.peek(2).type==="string" && tlist.peek(3).match("operator","=")) ){
+
+		// If the next few tokens are the start of the next production or end of input, break loop
+		if( !tlist.peek() && toplevel ||
+			tlist.peek().type==="identifier" && (
+				tlist.peek(2) && tlist.peek(2).match("operator","=") ||
+				tlist.peek(3) && tlist.peek(2).type==="string" && tlist.peek(3).match("operator","=")
+			)
+		){
 			choice.push(series);
 			break;
 		}
@@ -51,16 +55,16 @@ var build_and = function(tlist, toplevel, labels){
 
 		// Predicate
 		if(lookahead && (next=tlist.peek()) && next.type==="code"){
-			// series.push( new pattern.predicate(tlist.next().data) );
-			item = series.length===0 ? new pattern.empty() :
-				series.length===1 ? series[0] : new pattern.and(series);
+			item = ( series.length===0 ? new pattern.empty() :
+				series.length===1 ? series[0] : new pattern.and(series) );
 			series = [ new pattern.predicate(lookahead===1,item,tlist.next().data,labels) ];
 			continue;
 		}
 
 		// Label
 		if( tlist.peek(2) && tlist.peek().type==="identifier" && tlist.peek(2).match("operator",":") ){
-			labels.push( label = tlist.next().data );
+			label = tlist.next().data;
+			if(labels.indexOf(label)===-1) labels.push(label);
 			if(label==="this" || label==="args")
 				throw new Error("Reserved : Cannot use \""+label+"\" as a label.");
 			tlist.next();
@@ -96,7 +100,7 @@ var build_and = function(tlist, toplevel, labels){
 
 		// Wrap & Insert
 		if(label) item = new pattern.label(label, item);
-		if(lookahead) item = new pattern.lookahead( lookahead===1?true:false, item );
+		if(lookahead) item = new pattern.lookahead( lookahead===1 , item );
 		series.push(item);
 
 	} // while

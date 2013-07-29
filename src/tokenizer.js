@@ -58,9 +58,9 @@ var read_str = function(str,i,delimiter){
 In a block of JavaScript code, in order to determine whether a "/" marks the start
 of a regular expression, or is a division operator, we need some context information.
 The division operator will appear only after a ")" (marking the end of a parenthesized
-expression), an alphanumeric character or a numeric value, which would be the dividend
-itself. Hence, by tracking the last non-whitespace character (ignoring comments), we
-can make our decision.
+expression), an alphanumeric character or a numeric value (that can even be something
+like "1."), which would be the dividend itself. Hence, by tracking the last
+non-whitespace character (ignoring comments), we can make our decision.
 */
 var predivchar = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_).";
 
@@ -75,14 +75,18 @@ var read_code = function(str,i){
 
 		// single line comments
 		if(str.substr(i,2)==="//"){
+			current+="//";
 			i+=2;
-			while(str[++i] && str[i]!=="\n");
+			while(str[++i] && str[i]!=="\n") current+=str[i];
+			current+=str[i];
 			i+=1;
 
 		// multi line comments
 		} else if(str.substr(i,2)==="/*"){
+			current+="/*";
 			i+=2;
-			while(str[++i] && str.substr(i,2)!=="*/");
+			while(str[++i] && str.substr(i,2)!=="*/") current+=str[i];
+			current+="*/";
 			i+=2;
 
 		// string & regexp
@@ -108,7 +112,7 @@ var read_code = function(str,i){
 
 		// everything else
 		} else {
-			if(str[i]!=="\n" && str[i]!=="\r") current += str[i];
+			current += str[i];
 			if(whitespace.indexOf(str[i])===-1) lastchar = str[i];
 		}
 
@@ -121,6 +125,8 @@ var read_code = function(str,i){
 
 
 var operators = ["=","(",")","/","?","*","+",":",";","&","!"];
+var varname1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ_";
+var varname2 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
 
 var tokenize = function(str){
 	var i = 0, result = [], current;
@@ -143,10 +149,10 @@ var tokenize = function(str){
 			i+=2;
 
 		// strings
-		} else if(str[i]==="\""){
-			current = read_str(str,++i,"\"");
-			result.push( new Token("string",current[0]) );
+		} else if(str[i]==="\"" || str[i]==="'"){
+			current = read_str(str,i+1,str[i++]);
 			i = current[1]+1;
+			result.push( new Token("string",[current[0],str[i]==="i" && ++i && true]) );
 
 		// character range
 		} else if(str[i]==="["){
@@ -169,9 +175,9 @@ var tokenize = function(str){
 			i = current[1];
 
 		// identifiers
-		} else if(str[i].match(/[A-Za-z_]/)){
-			current = "";
-			while(str[i].match(/[A-Za-z0-9_]/)) current += str[i++];
+		} else if(varname1.indexOf(str[i].toUpperCase())!==-1){
+			current = str[i++];
+			while(varname2.indexOf(str[i].toUpperCase())!==-1) current += str[i++];
 			result.push( new Token("identifier",current) );
 
 		// operators
@@ -180,6 +186,7 @@ var tokenize = function(str){
 
 		// unknown
 		} else {
+			console.log(varname1.indexOf(str[i].toUpperCase()));
 			throw new Error("Unknown symbol : "+str[i]+" (index:"+i+")");
 		}
 

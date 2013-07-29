@@ -1,8 +1,6 @@
 
 var util = {
 
-	debug : 0,
-
 	clone : function(obj){
 		var result = obj; // null, undefined, number, string, function
 		if(obj instanceof RegExp){ // regexp

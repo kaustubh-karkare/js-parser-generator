@@ -1,11 +1,18 @@
 
 var util = require("./util");
 
-var State = function(parser,data){
+var State = function(parser,data,config){
 	this.parser = parser;
 	this.data = data;
 	this.index = 0;
-	this.env = {};
+	this.config = {
+		debug: 0,
+		unwrap: 1
+	};
+	if(config && typeof(config)==="object")
+		for(var key in config)
+			if(key in this.config)
+				this.config[key] = config[key];
 
 	this.localdata = [];
 	this.namedata = [];
@@ -43,11 +50,13 @@ State.prototype.save = function(){
 
 State.prototype.load = function(){
 	var that = this.alternative.pop();
-	// localdata not loaded, as this is set during redirection itself
-	this.index = that.index;
-	this.namedata = that.namedata;
-	this.predicate = that.predicate;
-	this.log(2,1,"<restored>",that.localdata.slice(-1)[0]);
+	if(that){
+		// localdata not loaded, as this is set during redirection itself
+		this.index = that.index;
+		this.namedata = that.namedata;
+		this.predicate = that.predicate;
+		this.log(2,1,"<restored>",that.localdata.slice(-1)[0]);
+	}
 };
 
 State.prototype.clone = function(){
@@ -137,7 +146,7 @@ State.prototype.local = function(initial){
 };
 
 State.prototype.log = function(level){
-	if(util.debug<level) return;
+	if(this.config.debug<level) return;
 	var args = Array.prototype.slice.call(arguments,1)
 			.map(function(x){ return JSON.stringify(x) }),
 		offset = ( !isNaN(parseInt(args[0])) ? parseInt(args.shift()) : 0 ),

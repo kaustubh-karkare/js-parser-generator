@@ -1,9 +1,10 @@
 
-### JavaScript Parser Generator
+## JavaScript Parser Generator
 
-    node test.js > output.txt
+    node test/basic.js # simple grammar constructs
+    node test/program.js # basic programming language
 
-* Grammar: http://pegjs.majda.cz/documentation#grammar-syntax-and-semantics
-* Except for the options that can be passed to the `buildParser` function, all other features mentioned on that page have been implemented. There may, however, be minor differences in implementation.
+## Random Notes
 
+* This project is based on http://pegjs.majda.cz/. There are, however, differences in implementation.
 * JavaScript's inbuilt RegExp implementation has not been used anywhere.

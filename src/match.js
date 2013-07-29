@@ -24,8 +24,9 @@ module.exports = {
 	"string" : function(state){
 		var t = state.data.substr(state.index,this.data.length);
 		state.log(2,"<string/>",this.data,t);
-		if(this.data===t) return state.match(t);
-		else {
+		if(this.data===t || this.ignoreCase && this.data.toLowerCase()===t.toLowerCase()){
+			return state.match(t);
+		} else {
 			state.mismatch(this.data);
 			return state.local(); // null
 		}
@@ -52,7 +53,7 @@ module.exports = {
 			}
 		}
 		state.log(2,"<range/>",this.display,c,found^this.negative);
-		if(found^this.negative) return state.match(c);
+		if(c && found^this.negative) return state.match(c);
 		else {
 			state.mismatch(this.display);
 			return state.local(); // null
@@ -153,12 +154,20 @@ module.exports = {
 	},
 
 	"lookahead" : function(state){
-		state.log(2,"<lookahead>",this.name);
-		var index = state.index;
-		var temp = this.pattern.match(state);
-		state.log(2,"</lookahead>",this.name,temp);
-		if(temp) state.index = index;
-		return temp;
+		state.log(2,"<lookahead>");
+		while(true){
+			var index = state.index;
+			var temp = this.pattern.match(state);
+			state.index = index;
+			state.log(2,"</lookahead>",temp);
+			if(this.positive===!!temp){
+				return "";
+			} else {
+				if(state.redirect.length>0) return null;
+				state.mismatch(this);
+				if(state.redirect[0]===null) return state.local();
+			}
+		}
 	},
 
 	// Interactive Nodes
@@ -187,15 +196,19 @@ module.exports = {
 		state.namedata.push(data);
 		var temp = this.pattern.match(state);
 		data = state.namedata.pop(); // data can be undefined if names are specified outside actions
+		
 		if(temp){
-			// remove unnecessary array wrappers
-			for(var key in data)
-				if(data[key].length===0) delete data[key];
-				else if(data[key].length===1) data[key] = data[key][0];
-			var node = new ast( this.labels , data || {} , state.env, this.code );
+			if(state.config.unwrap){
+				// remove unnecessary array wrappers
+				for(var key in data)
+					if(data[key].length===0) delete data[key];
+					else if(data[key].length===1) data[key] = data[key][0];
+			}
+
+			var node = new ast( this.labels , only("eval",data) , state.env, this.code );
 			// save string data only if a predicate node is an ancestor
 			if(state.predicate.filter(function(p){ return !!p; }).length>0)
-				node.str = stronly(temp);
+				node.str = only("str",temp);
 			temp = node;
 		}
 		state.log(2,"</action>",temp);
@@ -210,23 +223,30 @@ module.exports = {
 			data = {};
 			for(var i=0; i<this.labels.length; ++i)
 				data[this.labels[i]] = [];
+
 			// process pattern
 			state.predicate.push(data);
 			temp = this.pattern.match(state);
 			data = state.predicate.pop();
 			if(temp===null) return null;
-			// remove unnecessary array wrappers & replace ast nodes
-			for(var key in data)
-				if(data[key].length===0) delete data[key];
-				else if(data[key].length===1) data[key] = data[key][0];
-			data = stronly(data);
+
+			if(state.config.unwrap){
+				// remove unnecessary array wrappers & replace ast nodes
+				for(var key in data)
+					if(data[key].length===0) delete data[key];
+					else if(data[key].length===1) data[key] = data[key][0];
+			}
+
+			data = only("str",data);
 			// run predicate code
 			result = this.positive === !!state.env("(function(" + this.labels.join(",") + ")" +
 				this.code + ")").apply( null, this.labels.map(function(x){ return data[x]; }) );
+
 			if(result){
 				state.log(2,"</predicate>",data);
 				return temp;
 			} else {
+				if(state.redirect.length>0) return null;
 				state.mismatch(this);
 				if(state.redirect[0]===null) return state.local();
 			}
@@ -235,13 +255,12 @@ module.exports = {
 
 };
 
-var stronly = function(data){
+var only = function(attr,data){
 	if(typeof(data)==="string") return data;
-	else if(data instanceof ast) return data.str;
-	else if(Array.isArray(data)) return data.map(arguments.callee);
+	else if(data instanceof ast) return data[attr];
 	else if(typeof(data)==="object" && data!==null){
-		var result = {};
-		for(var key in data) result[key] = arguments.callee(data[key]);
+		var result = Array.isArray(data) ? [] : {};
+		for(var key in data) result[key] = arguments.callee(attr,data[key]);
 		return result;
 	}
 };

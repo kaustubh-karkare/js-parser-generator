@@ -3,15 +3,18 @@ var tokenize = require("./tokenizer"),
 	build = require("./build"),
 	State = require("./state");
 
-var Parser = function(grammar){
+var Parser = function(grammar,config){
 	this.production = {};
-	this.init = "";
 	this.start = null;
+	this.config = config
 
-	var tlist = tokenize(grammar);
+	var tlist = tokenize(grammar),
+		code = "";
 	if(tlist.peek() && tlist.peek().type==="code")
-		this.init = eval("(function(){" + tlist.next().data +
-			"return function(code){ return eval(code); }; })");
+		code = tlist.next().data;
+
+	this.init = eval("(function(){" + code +
+		"return function(code){ return eval(code); }; })");
 
 	var p;
 	while(tlist.peek()){
@@ -24,7 +27,7 @@ var Parser = function(grammar){
 };
 
 Parser.prototype.parse = function(data){
-	var state = new State(this,data);
+	var state = new State(this,data,this.config);
 	// Set Up Execution Environment
 	state.env = this.init();
 	// Syntactically analyze the given data

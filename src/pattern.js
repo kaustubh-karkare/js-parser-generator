@@ -1,5 +1,5 @@
 
-var debug = require("./util").debug;
+var debug = 0;
 
 var pattern = {
 
@@ -19,7 +19,8 @@ var pattern = {
 
 	"string" : function(data){
 		if(debug) this.type = "string";
-		this.data = data;
+		this.data = data[0];
+		this.ignoreCase = data[1];
 	},
 
 	"range" : function(data){

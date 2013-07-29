@@ -6,7 +6,7 @@ var ast = function(labels,data,env,code){
 	this.data = data;
 	this.eval = env("(function(){ var args = Array.prototype.slice.call(arguments);" +
 		"return (function(" + labels.join(",") + ")" + code + ")(" +
-		labels.map(function(x){ return "this.data."+x; }).join(",") + "); })");
+		labels.map(function(x){ return "this.data."+x; }).join(",") + "); })").bind(this);
 };
 
 ast.prototype.execute = function(env){
