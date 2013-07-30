@@ -1,26 +1,18 @@
 
 var util = require("./util");
 
-var State = function(parser,data,config){
+var State = function(parser,data){
 	this.parser = parser;
 	this.data = data;
 	this.index = 0;
-	this.config = {
-		debug: 0,
-		unwrap: 1
-	};
-	if(config && typeof(config)==="object")
-		for(var key in config)
-			if(key in this.config)
-				this.config[key] = config[key];
 
 	this.localdata = [];
-	this.namedata = [];
-	this.predicate = [];
+	this.labelled = [];
 	this.alternative = [];
 	this.redirect = [];
-	// this.expected = [];
 };
+
+module.exports = State;
 
 State.prototype.push = function(data){
 	this.localdata.push(data);
@@ -40,8 +32,7 @@ State.prototype.save = function(){
 	var that = {
 		"localdata" : util.clone(this.localdata),
 		"index" : this.index,
-		"namedata" : util.clone(this.namedata),
-		"predicate" : util.clone(this.predicate),
+		"labelled" : util.clone(this.labelled),
 	};
 	this.alternative.push(that);
 	this.log(2,"<alternative>",that.localdata.slice(-1)[0]);
@@ -53,9 +44,8 @@ State.prototype.load = function(){
 	if(that){
 		// localdata not loaded, as this is set during redirection itself
 		this.index = that.index;
-		this.namedata = that.namedata;
-		this.predicate = that.predicate;
-		this.log(2,1,"<restored>",that.localdata.slice(-1)[0]);
+		this.labelled = that.labelled;
+		this.log(2,1,"<restored>",that.localdata.slice(-1)[0],this.expected);
 	}
 };
 
@@ -68,59 +58,12 @@ State.prototype.clone = function(){
 	return that;
 };
 
-/*
-State.prototype.diff = function(that){
-	var result = {};
-	for(var key in this)
-		if(Array.isArray(this[key])){
-			var k = 0; result[key] = {};
-			for(var i=0; i<this[key].length; ++i)
-				if(JSON.stringify(this[key][i])!==JSON.stringify(that[key][i])){
-					result[key]["+"+i] = this[key][i];
-					if(that[key][i]!==undefined) result[key]["-"+i] = that[key][i];
-					k=1;
-				}
-			if(this[key].length!==that[key].length)
-				{ result[key].length = this[key].length - that[key].length; k=1; }
-			if(!k) delete result[key];
-		}
-	result.index = this.index - that.index
-	return result;
-};
-
-State.prototype.add = function(diff){
-	that = this;
-	for(var key in diff)
-		if(Array.isArray(this[key])){
-			if("length" in diff[key]) this[key].length += diff[key].length;
-			Object.keys(diff[key]).forEach(function(i){
-				if(i[0]==="+") that[key][i.substr(1)] = diff[key][i];
-			});
-		}
-	this.index += diff.index;
-};
-
-State.prototype.sub = function(diff){
-	that = this;
-	for(var key in diff)
-		if(Array.isArray(this[key])){
-			if("length" in diff[key]) this[key].length -= diff[key].length;
-			Object.keys(diff[key]).forEach(function(i){
-				if(i[0]==="-") that[key][i.substr(1)] = diff[key][i];
-			});
-		}
-	this.index -= diff.index;
-};
-*/
-
 State.prototype.match = function(unit){
 	this.index += unit.length;
-	// this.expected = [];
 	return unit;
 };
 
 State.prototype.mismatch = function(unit){
-	// this.expected.push(this.index,unit);
 	if(this.alternative.length===0){
 		for(var i=0; i<this.localdata.length; ++i)
 			this.redirect.push(null);
@@ -133,7 +76,6 @@ State.prototype.mismatch = function(unit){
 		this.log(2,"<mismatch>",this.redirect,i,this.localdata,that.localdata);
 		if(this.redirect.length===0) this.load(); // delayed so that it can be ignored midway
 	}
-	// return this.local();
 };
 
 State.prototype.local = function(initial){
@@ -146,12 +88,11 @@ State.prototype.local = function(initial){
 };
 
 State.prototype.log = function(level){
-	if(this.config.debug<level) return;
-	var args = Array.prototype.slice.call(arguments,1)
-			.map(function(x){ return JSON.stringify(x) }),
-		offset = ( !isNaN(parseInt(args[0])) ? parseInt(args.shift()) : 0 ),
-		tab = new Array(this.localdata.length+offset).join("\t");
-	console.log(tab+args.join(" "));
+	if(this.parser.config.debug && level<=2){
+		var args = Array.prototype.slice.call(arguments,1)
+				.map(function(x){ return JSON.stringify(x) }),
+			offset = ( !isNaN(parseInt(args[0])) ? parseInt(args.shift()) : 0 ),
+			tab = new Array(this.labelled.length+this.localdata.length+offset).join("\t");
+		console.log(tab+args.join(" "));
+	}
 };
-
-module.exports = State;

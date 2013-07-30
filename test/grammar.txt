@@ -45,11 +45,11 @@ _ = whitespace*
 
 statement
 	= "{" _ list:statement* "}" _
-		{ toarray(list).forEach(function(s){ return s(); }); }
+		{ return toarray(list).map(function(s){ return s(); }); }
 	/ "if" _ "(" _ c:expression ")" _ t:statement ( "else" _ e:statement )?
-		{ c() ? t() : e && e(); }
+		{ return c() ? t() : e && e(); }
 	/ "while" _ "(" _ c:expression ")" _ t:statement
-		{ while(c()) t(); }
+		{ var l = []; while(c()) l.push(t()); return l; }
 	/ "repeat" _ "(" _ c:expression ")" _ t:statement
 		{ for(var i=0, j=c(); i<j; ++i) t(); }
 	/ exp:expression ";" _
@@ -89,4 +89,4 @@ exp_val
 rvalue = name:lvalue { return data[name()] || 0; } ;
 lvalue = name:([A-Za-z_][A-Za-z0-9_]*) _ { return toarray(name).join(""); } ;
 
-integer = digits:[+-]? _ digits:[0-9]+ _ { return parseInt(toarray(digits).join(""),10); } ;
+integer = (digits:[+-] _)? digits:[0-9]+ _ { return parseInt(toarray(digits).join(""),10); } ;

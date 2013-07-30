@@ -3,14 +3,14 @@ var debug = 0;
 
 var pattern = {
 
-
 	// Root Node
 
-	"production" : function(name, altname, pattern){
+	"production" : function(name, altname, pattern, labels){
 		if(debug) this.type = "production";
 		this.name = name;
 		this.altname = altname;
 		this.pattern = pattern;
+		this.labels = labels;
 	},
 
 	// Leaf Nodes
@@ -28,7 +28,7 @@ var pattern = {
 		this.data = data[0];
 		this.ignoreCase = (data[1].indexOf("i")!==-1);
 		this.negative = (data[1].indexOf("n")!==-1);
-		if(debug) this.display = "["+(this.negative?"^":"")+this.data+"]"+(this.ignoreCase?"i":"");
+		this.display = "["+(this.negative?"^":"")+this.data+"]"+(this.ignoreCase?"i":"");
 	},
 
 	"reference": function(name){
@@ -69,19 +69,16 @@ var pattern = {
 		this.pattern = pattern;
 	},
 
-	"action" : function(pattern,code,labels){
+	"action" : function(pattern,code){
 		if(debug) this.type = "action";
 		this.pattern = pattern;
 		this.code = code;
-		this.labels = labels;
 	},
 
-	"predicate" : function(positive,pattern,code,labels){
+	"predicate" : function(positive,code){
 		if(debug) this.type = "predicate";
 		this.positive = positive;
-		this.pattern = pattern;
 		this.code = code;
-		this.labels = labels;
 	}
 
 };

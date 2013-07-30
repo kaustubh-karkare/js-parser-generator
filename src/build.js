@@ -2,7 +2,6 @@
 var pattern = require("./pattern");
 
 var build_and = function(tlist, toplevel, labels){
-	labels = labels || [];
 
 	var series = [], choice = [], next;
 	var lookahead, label, item, loop, greedy, action;
@@ -41,8 +40,7 @@ var build_and = function(tlist, toplevel, labels){
 		if( (next=tlist.peek()) && next.type==="code" ){
 			series = ( series.length===0 ? new pattern.empty() :
 				series.length===1 ? series[0] : new pattern.and(series) );
-			series = [new pattern.action( series, tlist.next().data, labels )];
-			labels = [];
+			series = [new pattern.action( series, tlist.next().data )];
 			continue;
 		}
 
@@ -55,9 +53,7 @@ var build_and = function(tlist, toplevel, labels){
 
 		// Predicate
 		if(lookahead && (next=tlist.peek()) && next.type==="code"){
-			item = ( series.length===0 ? new pattern.empty() :
-				series.length===1 ? series[0] : new pattern.and(series) );
-			series = [ new pattern.predicate(lookahead===1,item,tlist.next().data,labels) ];
+			series.push( new pattern.predicate(lookahead===1,tlist.next().data) );
 			continue;
 		}
 
@@ -115,7 +111,7 @@ var build_and = function(tlist, toplevel, labels){
 };
 
 var build_production = function(tlist){
-	var next, name, altname = null, item;
+	var next, name, altname = null, item, labels = [];
 
 	if( (next=tlist.next())===null || next.type!=="identifier")
 		throw new Error("Expected Production Name");
@@ -127,9 +123,9 @@ var build_production = function(tlist){
 	if( (next=tlist.next())===null || !next.match("operator","="))
 		throw new Error("Expected '='");
 
-	item = build_and(tlist, true);
+	item = build_and(tlist, true, labels);
 
-	return new pattern.production(name,altname,item);
+	return new pattern.production(name,altname,item,labels);
 };
 
 module.exports = {

@@ -1,34 +1,68 @@
 
 var pg = require("../src/");
 
-var tests = [
-	// and, label, action
-	"a = s:'a' s:'B'i s:'c' { return s.join(''); }", "abc", "abc",
-	// loop, greedy, mismatch
-	"a = x:'a'* y:('a' 'a' 'a') { return x.join(''); }", "aaaaa", "aa",
-	// loop, non-greedy, mismatch
-	"a = x:'a'*? y:('a' 'b' 'c') { return x.join(''); }", "aaabc", "aa",
-	// predicates
-	"a = x:. &{ return x==='a'; } y:. !{ return y==='c'; } { return x+y; }", "ab", "ab", // !{ return x==='A'; }
-	// lookaheads
-	"a = ![^c] x:. &x:'d' . { return x.join(''); }", "cd", "cd",
-	"a = &x:'a'* .* 'ab' { return x.join(''); }; ", "aaab", "aaa",
-	// error: empty starting production
-	"a = b = 'a' { return 42; }", "a", null,
+var test = [
+	{ // and, label, action
+		"grammar": "a = s:'a' s:'B'i s:('c'/'C') { return s.join(''); }",
+		"input": "abc",
+		"result": "abc"
+	},
+	{ // choice, loop, greedy, backtracking
+		"grammar": "a = x:('a'/'A')* y:('a' 'a' 'a') { return x.join(''); }",
+		"input": "aAaaa",
+		"result": "aA"
+	},
+	{ // loop, non-greedy, backtracking
+		"grammar": "a = x:'a'*? y:('a' 'b' 'c') { return x.join(''); }",
+		"input": "aaabc",
+		"result": "aa"
+	},
+	{ // predicates
+		"grammar": "a = x:. &{ return x==='a'; } y:. !{ return y==='c'; } { return x+y; }",
+		"input": "ab",
+		"result": "ab"
+	},
+	{ // lookaheads
+		"grammar": "a = ![^c] x:. &x:'d' . { return x.join(''); }",
+		"input": "cd",
+		"result": "cd"
+	},
+	{ // lookaheads
+		"grammar": "a = &x:'a'* .* 'ab' { return x.join(''); }; ",
+		"input": "aaab",
+		"result": "aaa"
+	},
+	{ // error: empty starting production
+		"grammar": "a = b = 'a' { return 42; }",
+		"input": "a",
+		"result": null
+	}
 ];
 
-for(var i=2; i<tests.length; i+=3){
-	var g = tests[i-2], d = tests[i-1], v = tests[i], t = new Date().getTime(), r;
-	console.log("\n\tGrammer : "+g+"\n\tData    : "+d);
+var print = process.stdout.write.bind(process.stdout);
+
+for(var i=0; i<test.length; ++i){
+
+	var time = new Date().getTime(); // start time
+	print(
+		"\n\tGrammer : " + test[i].grammar +
+		"\n\tInput   : " + test[i].input );
 	try {
-		r = new pg(g).parse(d).execute();
-		if(JSON.stringify(r)!==JSON.stringify(v))
-			throw new Error("Incorrect Evaluation Result : "+JSON.stringify(r));
+		var result = pg.buildParser(test[i].grammar,{debug:0}).parse(test[i].input)();
+		if( JSON.stringify(test[i].result)!==JSON.stringify(result) )
+			throw new Error("Incorrect Evaluation Result : " + JSON.stringify(result) );
 	} catch(e){
-		if(tests[i]!==null){ console.log("\nTest Failed.\n"+e.stack); break; }
+		if(test[i].result!==null){
+			print("\n\nTest Failed.\n" + e.stack + "\n\n");
+			break;
+		}
 	}
-	t = new Date().getTime() - t;
-	console.log("\tValue   : "+v+"\n\tTime    : "+t+" ms\n");
+	time = new Date().getTime() - time; // time difference
+	print(
+		"\n\tValue   : " + test[i].result +
+		"\n\tTime    : " + time + " ms" +
+		"\n" );
 }
 
-if(i>=tests.length) console.log("All tests completed successfully.\n")
+if(i>=test.length)
+	print("\nAll tests completed successfully.\n\n");

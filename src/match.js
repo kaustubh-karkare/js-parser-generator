@@ -7,9 +7,13 @@ module.exports = {
 
 	"production" : function(state){
 		state.log(1,"<production>",this.name);
-		state.predicate.push(null);
+		// initialize data object
+		var data = {};
+		for(var i=0;i<this.labels.length;++i)
+			data[this.labels[i]] = [];
+		state.labelled.push(data);
 		var temp = this.pattern.match(state);
-		state.predicate.pop();
+		state.labelled.pop();
 		state.log(1,"</production>", this.name, temp);
 		return temp;
 	},
@@ -27,7 +31,7 @@ module.exports = {
 		if(this.data===t || this.ignoreCase && this.data.toLowerCase()===t.toLowerCase()){
 			return state.match(t);
 		} else {
-			state.mismatch(this.data);
+			state.mismatch(JSON.stringify(this.data));
 			return state.local(); // null
 		}
 	},
@@ -39,8 +43,8 @@ module.exports = {
 				cc = c.charCodeAt(),
 				cci = ci.charCodeAt();
 			for(var i=0,j,k,l; !found && i<this.data.length; ++i){
-				j = i+1<this.data.length && this.data[i]==="\\";
-				k = i+2<this.data.length && this.data[i+1]==="-" && !j;
+				j = i+1<this.data.length && this.data[i]==="\\"; // escaped?
+				k = i+2<this.data.length && this.data[i+1]==="-" && !j; // range?
 				if(k){
 					j = this.data[i].charCodeAt();
 					k = this.data[i+=2].charCodeAt();
@@ -55,7 +59,7 @@ module.exports = {
 		state.log(2,"<range/>",this.display,c,found^this.negative);
 		if(c && found^this.negative) return state.match(c);
 		else {
-			state.mismatch(this.display);
+			state.mismatch(JSON.stringify(this.display).slice(1,-1));
 			return state.local(); // null
 		}
 	},
@@ -77,13 +81,12 @@ module.exports = {
 			if(temp!==null){
 				local.series.push(temp);
 			} else {
-				local = state.local(null);
+				state.top( local = state.local(null) );
 				if(local===null){
 					state.log(2,"</and>","mismatch");
 					state.pop();
 					return null;
 				}
-				else state.top(local);
 			}
 		}
 		temp = state.pop().series;
@@ -109,13 +112,12 @@ module.exports = {
 				state.pop();
 				return temp;
 			} else {
-				local = state.local(null);
+				state.top( local = state.local(null) );
 				if(local===null){
 					state.log(2,"</or>","mismatch");
 					state.pop();
 					return null;
 				}
-				else state.top(local);
 			}
 		}
 		throw new Error("The cats are plotting world domination.");
@@ -164,7 +166,7 @@ module.exports = {
 				return "";
 			} else {
 				if(state.redirect.length>0) return null;
-				state.mismatch(this);
+				state.mismatch("<lookahead>");
 				if(state.redirect[0]===null) return state.local();
 			}
 		}
@@ -176,12 +178,8 @@ module.exports = {
 		state.log(2,"<label>",this.name);
 		var temp = this.pattern.match(state);
 		if(temp){
-			// provide data to nearest action
-			var last = state.namedata[state.namedata.length-1];
+			var last = state.labelled[state.labelled.length-1];
 			last[this.name].push(temp);
-			// provide data to nearest predicate
-			last = state.predicate[state.predicate.length-1];
-			if(last) last[this.name].push(temp);
 		}
 		state.log(2,"</label>",this.name,temp);
 		return temp;
@@ -189,65 +187,50 @@ module.exports = {
 
 	"action" : function(state){
 		state.log(2,"<action>");
-		// prepare the data object and match
-		var data = {};
-		for(var i=0; i<this.labels.length; ++i)
-			data[this.labels[i]] = [];
-		state.namedata.push(data);
 		var temp = this.pattern.match(state);
-		data = state.namedata.pop(); // data can be undefined if names are specified outside actions
-		
 		if(temp){
-			if(state.config.unwrap){
-				// remove unnecessary array wrappers
-				for(var key in data)
-					if(data[key].length===0) delete data[key];
-					else if(data[key].length===1) data[key] = data[key][0];
-			}
-
-			var node = new ast( this.labels , only("eval",data) , state.env, this.code );
-			// save string data only if a predicate node is an ancestor
-			if(state.predicate.filter(function(p){ return !!p; }).length>0)
-				node.str = only("str",temp);
-			temp = node;
+			var le = state.parser.config.lazyeval;
+			var last = only("eval",state.labelled[state.labelled.length-1],!le);
+			if(state.parser.config.unwrap) last = unwrap(last);
+			temp = new ast({
+				"str": only("str",temp),
+				"data": last,
+				"env": state.env,
+				"code": this.code,
+				"lazyeval": le
+			});
 		}
 		state.log(2,"</action>",temp);
 		return temp;
 	},
 
 	"predicate" : function(state){
-		var temp, data, result;
 		state.log(2,"<predicate>",this.labels);
 		while(true){
-			// prepare the data object
-			data = {};
-			for(var i=0; i<this.labels.length; ++i)
-				data[this.labels[i]] = [];
+			var last = only("str",state.labelled[state.labelled.length-1]);
+			if(state.parser.config.unwrap) last = unwrap(last);
+			var that = {
+				data: state.data,
+				index: state.index, // if increased, will cause state.index to increase too
+				string: null, // the string returned to the calling function
+				error: "Predicate Failure" // default error message
+			};
 
-			// process pattern
-			state.predicate.push(data);
-			temp = this.pattern.match(state);
-			data = state.predicate.pop();
-			if(temp===null) return null;
+			var result = (function(){
+				var ast, state, module; // hide global
+				var data, that, result; // hide local
+				return arguments[0]("(function(" + arguments[1].join(",") + ")" + arguments[4] + ")").apply(
+					arguments[3], arguments[1].map((function(x){ return this[x]; }).bind(arguments[2])) );
+			}).call( null, state.env, Object.keys(last), last, that, this.code );
 
-			if(state.config.unwrap){
-				// remove unnecessary array wrappers & replace ast nodes
-				for(var key in data)
-					if(data[key].length===0) delete data[key];
-					else if(data[key].length===1) data[key] = data[key][0];
-			}
-
-			data = only("str",data);
-			// run predicate code
-			result = this.positive === !!state.env("(function(" + this.labels.join(",") + ")" +
-				this.code + ")").apply( null, this.labels.map(function(x){ return data[x]; }) );
-
-			if(result){
-				state.log(2,"</predicate>",data);
-				return temp;
+			state.log(2,"</predicate>",result);
+			if(this.positive === !!result){
+				result = state.match( that.index>state.index ?
+					state.data.slice(this.index,that.index) : "" );
+				return typeof(that.string)==="string" ? that.string : result;
 			} else {
 				if(state.redirect.length>0) return null;
-				state.mismatch(this);
+				state.mismatch(that.error);
 				if(state.redirect[0]===null) return state.local();
 			}
 		}
@@ -255,12 +238,19 @@ module.exports = {
 
 };
 
-var only = function(attr,data){
+var only = function(attr,data,le){
 	if(typeof(data)==="string") return data;
-	else if(data instanceof ast) return data[attr];
+	else if(data instanceof ast) return le ? data[attr]() : data[attr];
 	else if(typeof(data)==="object" && data!==null){
 		var result = Array.isArray(data) ? [] : {};
 		for(var key in data) result[key] = arguments.callee(attr,data[key]);
 		return result;
 	}
 };
+
+var unwrap = function(data){
+	for(var key in data)
+		if(data[key].length===0) data[key] = null;
+		else if(data[key].length===1) data[key] = data[key][0];
+	return data;
+}

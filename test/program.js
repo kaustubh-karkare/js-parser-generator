@@ -17,22 +17,18 @@ var timer = function(fn){
 
 var pg = require("../src/");
 
-var parser = timer(function(){
-	return new pg( filedata("grammar.txt"), {} );
-});
+var grammar = filedata("grammar.txt"),
+	program = filedata("code.txt");
+
+var parser = timer(function(){ return pg.buildParser(grammar,{ lazyeval:1 }); });
 // print("Generated Parser",parser[0],1);
 
-var program = filedata("code.txt");
 print("Input Program",program);
 
-var syntaxtree = timer(function(){
-	return parser[0].parse( program );
-});
+var syntaxtree = timer(function(){ return parser[0].parse(program); });
 // print("Syntax Tree",syntaxtree[0],1);
 
-var value = timer(function(){
-	return syntaxtree[0].execute();
-});
+var value = timer(function(){ return syntaxtree[0](); });
 print("Execution Result",value[0],1);
 
 print("Processing Times",{
