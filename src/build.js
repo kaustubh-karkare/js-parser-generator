@@ -116,7 +116,7 @@ var build_production = function(tlist){
 		throw new Error("Expected Production Name");
 	else name = next.data;
 
-	if( tlist.peek() && next.type==="string")
+	if( (next=tlist.peek()) && next.type==="string")
 		altname = tlist.next().data;
 
 	if( (next=tlist.next())===null || !next.match("operator","="))

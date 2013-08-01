@@ -95,7 +95,7 @@ var read_code = function(str,i){
 			current += delimiter = str[i];
 			while(str[++i])
 				if(str[i]===delimiter) break;
-				else if(str[i]==="\\") current += str[++i];
+				else if(str[i]==="\\") current += str[i]+str[++i];
 				else current += str[i];
 			current += str[i];
 			lastchar = delimiter;

@@ -206,7 +206,7 @@ module.exports = {
 	},
 
 	"predicate" : function(state){
-		state.log(2,"<predicate>",this.labels);
+		state.log(2,"<predicate>",this.labels,this.code);
 		while(true){
 			var last = only("str",state.labelled[state.labelled.length-1]);
 			if(state.parser.config.unwrap) last = unwrap(last);
@@ -224,11 +224,10 @@ module.exports = {
 					arguments[3], arguments[1].map((function(x){ return this[x]; }).bind(arguments[2])) );
 			}).call( null, state.env, Object.keys(last), last, that, this.code );
 
-			state.log(2,"</predicate>",result);
+			state.log(2,"</predicate>",result,that.result);
 			if(this.positive === !!result){
-				result = state.match( that.index>state.index ?
-					state.data.slice(this.index,that.index) : "" );
-				return typeof(that.result)==="string" ? that.result : result;
+				state.match( that.index>state.index ? state.data.slice(this.index,that.index) : "" );
+				return that.result ? new custom(that.result) : "";
 			} else {
 				if(state.redirect.length>0) return null;
 				state.mismatch(that.error);
@@ -239,12 +238,15 @@ module.exports = {
 
 };
 
-var only = function(attr,data,le){
+var custom = function(data){ this.data = data; };
+
+var only = function(attr,data,e){
 	if(typeof(data)==="string") return data;
-	else if(data instanceof ast) return le ? data[attr]() : data[attr];
+	else if(data instanceof ast) return e ? data[attr]() : data[attr];
+	else if(data instanceof custom) return data.data;
 	else if(typeof(data)==="object" && data!==null){
 		var result = Array.isArray(data) ? [] : {};
-		for(var key in data) result[key] = arguments.callee(attr,data[key]);
+		for(var key in data) result[key] = arguments.callee(attr,data[key],e);
 		return result;
 	}
 };

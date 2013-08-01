@@ -55,9 +55,10 @@ var Parser = function(grammar,config){
 
 Parser.prototype.parse = function(data,args){
 	var state = new State(this,data);
-	state.env = this.init(Array.isArray(args)?args:[]); // Set Up Execution Environment
+	state.env = this.init.call( {"config":this.config }, Array.isArray(args)?args:[] ); // Set Up Execution Environment
 	var ast = this.start.match(state); // Syntactically analyze the given data
-	return this.config.lazyeval ? ast.eval : ast.eval();
+	ast && (ast.eval.ast = ast);
+	return this.config.lazyeval ? ast && ast.eval : ast && ast.eval();
 };
 
 module.exports = Parser;
