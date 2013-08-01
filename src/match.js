@@ -141,6 +141,7 @@ module.exports = {
 				else local.list.push(temp);
 			}
 		} else { // if not greedy
+			state.log(2,"<loop>",this.pattern,this.maximum,this.greedy,local);
 			if(local.list.length<this.maximum){
 				temp = this.pattern.match( clone = state.clone() );
 				if(temp!==null){
@@ -212,7 +213,7 @@ module.exports = {
 			var that = {
 				data: state.data,
 				index: state.index, // if increased, will cause state.index to increase too
-				string: null, // the string returned to the calling function
+				result: null, // the string returned to the calling function
 				error: "Predicate Failure" // default error message
 			};
 
@@ -227,7 +228,7 @@ module.exports = {
 			if(this.positive === !!result){
 				result = state.match( that.index>state.index ?
 					state.data.slice(this.index,that.index) : "" );
-				return typeof(that.string)==="string" ? that.string : result;
+				return typeof(that.result)==="string" ? that.result : result;
 			} else {
 				if(state.redirect.length>0) return null;
 				state.mismatch(that.error);

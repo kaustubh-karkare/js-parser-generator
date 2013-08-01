@@ -124,7 +124,7 @@ var read_code = function(str,i){
 
 
 
-var operators = ["=","(",")","/","?","*","+",":",";","&","!"];
+var operators = ["=","(",")","/","|","?","*","+",":",";","&","!"];
 var varname1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ_";
 var varname2 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
 

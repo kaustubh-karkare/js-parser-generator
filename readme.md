@@ -7,8 +7,7 @@
 ## Usage
 
 ```javascript
-var pg = require("./src"),
-	parser = pg.buildParser( <string:grammar> , <object:config> ),
+var parser = require("./src").buildParser( <string:grammar> , <object:config> ),
 	result = parser.parse( <string:data> , <array:init> );
 console.log(result);
 ```
