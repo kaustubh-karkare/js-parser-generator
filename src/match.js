@@ -197,6 +197,7 @@ module.exports = {
 				"str": only("str",temp),
 				"data": last,
 				"env": state.env,
+				"context": state.context,
 				"code": this.code,
 				"lazyeval": le
 			});
@@ -211,22 +212,23 @@ module.exports = {
 			var last = only("str",state.labelled[state.labelled.length-1]);
 			if(state.parser.config.unwrap) last = unwrap(last);
 			var that = {
-				data: state.data,
 				index: state.index, // if increased, will cause state.index to increase too
 				result: null, // the string returned to the calling function
 				error: "Predicate Failure" // default error message
 			};
 
+			for(var key in that) state.context[key] = that[key];
 			var result = (function(){
 				var ast, state, module; // hide global
-				var data, that, result; // hide local
+				var data, that, key, result; // hide local
 				return arguments[0]("(function(" + arguments[1].join(",") + ")" + arguments[4] + ")").apply(
 					arguments[3], arguments[1].map((function(x){ return this[x]; }).bind(arguments[2])) );
-			}).call( null, state.env, Object.keys(last), last, that, this.code );
+			}).call( null, state.env, Object.keys(last), last, state.context, this.code );
+			for(var key in that) that[key] = state.context[key];
 
 			state.log(2,"</predicate>",result,that.result);
 			if(this.positive === !!result){
-				state.match( that.index>state.index ? state.data.slice(this.index,that.index) : "" );
+				if(that.index>state.index) state.index = that.index;
 				return that.result ? new custom(that.result) : "";
 			} else {
 				if(state.redirect.length>0) return null;

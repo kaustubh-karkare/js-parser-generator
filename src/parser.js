@@ -2,7 +2,8 @@
 var tokenize = require("./tokenizer"),
 	build = require("./build"),
 	pattern = require("./pattern"),
-	State = require("./state");
+	State = require("./state"),
+	util = require("./util");
 
 var Parser = function(grammar,config){
 
@@ -55,7 +56,9 @@ var Parser = function(grammar,config){
 
 Parser.prototype.parse = function(data,args){
 	var state = new State(this,data);
-	state.env = this.init.call( {"config":this.config }, Array.isArray(args)?args:[] ); // Set Up Execution Environment
+	var context = { "config": util.clone(this.config), "data": data };
+	state.env = this.init.call( context, Array.isArray(args)?args:[] ); // Set Up Execution Environment
+	state.context = context;
 	var ast = this.start.match(state); // Syntactically analyze the given data
 	ast && (ast.eval.ast = ast);
 	return this.config.lazyeval ? ast && ast.eval : ast && ast.eval();

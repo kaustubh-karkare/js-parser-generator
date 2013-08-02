@@ -1,0 +1,6 @@
+{
+	"name": "jspg",
+	"description": "A JavaScript Parser Generator",
+	"author": "Kaustubh Karkare <kaustubh.karkare@gmail.com>",
+	"main": "./src/",
+}

@@ -1,5 +1,5 @@
 
-var pg = require("../src/");
+var pg = require("../../src/");
 
 var test = [
 	{ // and, label, action
@@ -49,7 +49,7 @@ for(var i=0; i<test.length; ++i){
 		"\n\tInput   : " + test[i].input );
 	try {
 		var parser = pg.buildParser(test[i].grammar,{debug:0});
-		var result = parser.parse(test[i].input)();
+		var result = parser.parse(test[i].input);
 		if( JSON.stringify(test[i].result)!==JSON.stringify(result) )
 			throw new Error("Incorrect Evaluation Result : " + JSON.stringify(result) );
 	} catch(e){

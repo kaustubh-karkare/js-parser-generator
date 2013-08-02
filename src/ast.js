@@ -6,10 +6,11 @@ var ast = function(args){
 	this.str = args.str;
 	this.data = args.data;
 	var labels = Object.keys(args.data);
+	this.context = args.context;
 	this.eval = args.env(
 		"(function(){" + (args.lazyeval?"":"var args = Array.prototype.slice.call(arguments);") +
-		"return (function(" + labels.join(",") + ")" + args.code + ")(" +
-		labels.map(function(x){ return "this.data."+x; }).join(",") + "); })"
+		"return (function(" + labels.join(",") + ")" + args.code + ").apply(this.context,[" +
+		labels.map(function(x){ return "this.data."+x; }).join(",") + "]); })"
 	).bind(this);
 };
 
