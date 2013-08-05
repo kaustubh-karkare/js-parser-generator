@@ -15,4 +15,4 @@ console.log(result);
 ## Notes
 
 * This project is based on http://pegjs.majda.cz/. There are, however, differences in implementation.
-* JavaScript's inbuilt RegExp implementation has not been used anywhere.
+* No external libraries nor JavaScript's inbuilt RegExp implementation have been used in the main code.

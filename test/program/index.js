@@ -2,16 +2,20 @@
 var fs = require("fs"), path = require("path");
 
 var filedata = function(relpath){
-	return fs.readFileSync(__dirname+path.sep+relpath).toString();
+	return fs.readFileSync(path.join(__dirname+path.sep,relpath)).toString();
 };
-var print = function(heading,data,json){
+
+var print = function(heading,data,type){
 	console.log( "\n"+heading+"\n"+new Array(heading.length+1).join("=")+"\n");
-	console.log((json?JSON.stringify(data,null,"    "):data)+"\n" );
+	if(type) console.log((type===2?JSON.stringify(data,null,"    "):data)+"\n" );
+	else console.log("[suppressed]");
 };
+
 var Timer = function(){
 	var start = new Date().getTime();
 	return function(){ return (new Date().getTime()-start)+" ms"; };
 };
+
 var requiredir = function(relpath){
 	var dirpath = path.join(__dirname+path.sep,relpath);
 	if(!fs.existsSync(dirpath) || !fs.statSync(dirpath).isDirectory()) return null;
@@ -27,22 +31,22 @@ var requiredir = function(relpath){
 	return result;
 };
 
+////////// MAIN //////////
 
 var pg = require("../../src/"), timer;
 
-var grammar = filedata("./grammar.js"),
-	program = filedata("code.txt");
-
+var grammar = filedata("./grammar.js");
 timer = Timer();
 var parser = pg.buildParser(grammar,{ debug:0, lazyeval:1 });
-print("Generated Parser ("+timer()+")","[suppressed]" || parser,1);
+print("Generated Parser ("+timer()+")",parser,0);
 
-print("Input Program",program);
+var program = filedata("code.txt");
+print("Input Program",program,1);
 
 timer = Timer();
 var syntaxtree = parser.parse(program,[requiredir("lib"),requiredir("src")]);
-print("Syntax Tree ("+timer()+")","[suppressed]" || syntaxtree.ast,1);
+print("Syntax Tree ("+timer()+")",syntaxtree.ast,0);
 
 timer = Timer();
 var result = syntaxtree();
-print("Execution Result ("+timer()+")","[suppressed]" && result.toString(),1);
+print("Execution Result ("+timer()+")",result,2);

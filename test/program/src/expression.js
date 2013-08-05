@@ -3,7 +3,7 @@
 module.exports = function(lib,src){
 
 	// operators in decreasing order of precedence
-	var precedence = [["*","/","%"],["+","-"],["<","<=",">",">="],["==","!=","===","!=="],"&","^","|","&&","||"];
+	var precedence = [["**"],["*","/","%"],["+","-"],["<","<=",">",">="],["==","!=","===","!=="],"&","^","|","&&","||"];
 	// convert above array into object
 	for(var i=0, temp = {}; i<precedence.length || (precedence = temp) && false; ++i)
 		if(Array.isArray(precedence[i]))
