@@ -40,13 +40,15 @@ timer = Timer();
 var parser = pg.buildParser(grammar,{ debug:0, lazyeval:1 });
 print("Generated Parser ("+timer()+")",parser,0);
 
-var program = filedata("code.txt");
+var program = filedata("code.js");
 print("Input Program",program,1);
 
 timer = Timer();
-var syntaxtree = parser.parse(program,[requiredir("lib"),requiredir("src")]);
+var data = {};
+var syntaxtree = parser.parse(program,[requiredir("lib"),requiredir("src"),data]);
 print("Syntax Tree ("+timer()+")",syntaxtree.ast,0);
 
 timer = Timer();
 var result = syntaxtree();
 print("Execution Result ("+timer()+")",result,2);
+// print("Program Data",data,2);

@@ -2,7 +2,7 @@
 module.exports = function(lib,src){
 	
 	// basic datatypes in increasing order of size
-	var ordering = ["boolean","integer","string"];
+	var ordering = ["undefined","boolean","integer","string"];
 	var datatype = new Array(ordering.length);
 	for(var i=0;i<ordering.length;++i)
 		datatype[i] = src.datatype[ordering[i]];
@@ -15,7 +15,7 @@ module.exports = function(lib,src){
 		}
 		for(i=0; i<data.length; ++i)
 			if(type[i]<largest)
-				data[i] = new datatype[largest](data[i],type[i]);
+				data[i] = new datatype[largest](data[i],ordering[type[i]]);
 		return data;
 	};
 

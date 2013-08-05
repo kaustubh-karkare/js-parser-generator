@@ -78,7 +78,7 @@ var conv = {
 		}
 		return str.length ? str : "0";
 	}
-}
+};
 
 // Digit Array Operations
 var calc = {
@@ -217,8 +217,7 @@ bigint.prototype = {
 			new bigint({"d":calc.modulus(this.d,that.d), "s":this.s});
 	},
 	"power": function(that){
-		var i = translate(this), j = translate(that), k = matrix.pow[i][j];
-		return k!==2 ? bigint[k] : new bigint({
+		return new bigint({
 			"d": calc.power(this.d,that.d),
 			"s": (that.d[0]&1)&&(this.s===-1) ? -1 : 1
 		});
@@ -228,8 +227,8 @@ bigint.prototype = {
 	"lessThan": function(that){ var diff = this.subtract(that); return diff.s<0 && diff.d.length>0; },
 	"greaterThan": function(that){ var diff = this.subtract(that); return diff.s>0 && diff.d.length>0; },
 	"notEqualTo": function(that){ return !this.equalTo(that); },
-	"lessThanOrEqualTo": function(that){ return !this.greaterThan(this,that); },
-	"greaterThanOrEqualTo": function(that){ return !this.lessThan(this,that); },
+	"lessThanOrEqualTo": function(that){ return !this.greaterThan(that); },
+	"greaterThanOrEqualTo": function(that){ return !this.lessThan(that); },
 };
 
 var shortname = {

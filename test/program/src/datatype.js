@@ -8,10 +8,18 @@ var gettype = function(item){
 	return null;
 };
 
+datatype.undefined = function(lib){
+	var u = function(){
+		if(!(this instanceof u)) return new u();
+	};
+	return u;
+};
+
 datatype.boolean = function(lib){
 	var b = function(init, type){
 		type = type || gettype(init);
-		if(type==="boolean") this.value = init.value;
+		if(type==="undefined") this.value = false;
+		else if(type==="boolean") this.value = init.value;
 		else if(type==="integer") this.value = !init.value.eq(datatype.integer.zero.value);
 		else if(type==="string") this.value = (init.value!="");
 		else this.value = (init==="true");
@@ -23,7 +31,6 @@ datatype.boolean = function(lib){
 		else if(operator==="&&") return this.value && that.value ? b.true : b.false;
 		else return this.value || that.value ? b.true : b.false;
 	}
-	b.prototype.toString = function(){ return new datatype.string(this.value?"true":"false"); };
 	return b;
 };
 
@@ -31,8 +38,9 @@ datatype.integer = function(lib){
 	var bigint = lib.bigint;
 	var n = function(init,type){
 		type = type || gettype(init);
-		if(type==="boolean") this.value = (init.value ? n.one.value : n.zero.value);
-		else if(type==="integer") this.value = new bigint(init.value); 
+		if(type==="undefined") this.value = n.nan.value;
+		else if(type==="boolean") this.value = (init.value ? n.one.value : n.zero.value);
+		else if(type==="integer") this.value = init.value;
 		else if(type==="string")
 			try { this.value = new bigint(init.value); }
 			catch(e){ this.value = n.nan.value; }
@@ -57,13 +65,16 @@ datatype.integer = function(lib){
 		if(temp instanceof bigint) return new n(temp);
 		else if(typeof(temp)==="boolean") return datatype.boolean[temp];
 	};
-	n.prototype.toString = function(){ return new datatype.string(this.value.toString()); };
 	return n;
 };
 
 datatype.string = function(lib){
 	var s = function(init,type){
-		if(type || gettype(init)) this.value = init.toString().value;
+		type = type || gettype(init);
+		if(type==="undefined") this.value = "undefined";
+		else if(type==="boolean") this.value = (init.value ? "true" : "false");
+		else if(type==="integer") this.value = init.value.toString();
+		else if(type==="string") this.value = init.value;
 		else this.value = init+"";
 	};
 	var type1 = {
@@ -75,11 +86,10 @@ datatype.string = function(lib){
 		">": function(that){ return this.value>that.value; },
 		">=": function(that){ return this.value>=that.value; },
 	};
-	var type2 = ["-","*","/","%"], type3 = ["&","|","^","<<",">>"];
+	var type2 = ["-","*","/","%","**"];
 	s.prototype.operator = function(operator,that){
 		if(x=type1[operator]) return typeof(x=x.call(this,that))==="string" ? new s(x) : datatype.boolean[x];
 		else if(type2.indexOf(operator)) return new datatype.integer.nan;
-		else if(type3.indexOf(operator)) return new datatype.integer.zero;
 		else throw new Error("datatype.string.operation.not-implemented");
 	};
 	s.prototype.toString = function(){ return this; };

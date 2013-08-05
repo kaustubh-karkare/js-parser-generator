@@ -1,20 +1,19 @@
 
 {
+	var lib = args[0], src = args[1], data = args[2];
+	var order = ["predicate","datatype","operator","expression","memory"];
+	for(var i=0,j; j=order[i]; ++i) src[j] = src[j](lib,src,data);
 
 	var a = function(x){ return Array.isArray(x) ? x : (x?[x]:[]); };
-	var lib = args[0], src = args[1];
-
-	var order = ["predicate","datatype","operator","expression"];
-	for(var i=0,j; j=order[i]; ++i) src[j] = src[j](lib,src);
-
+	var boolean = function(x){ return new src.datatype.boolean(x).value; };
 }
 
-start = _ sl:statement* {
+program = _ sl:statement* {
 	return (function(obj){
 		if(obj && typeof(obj)==="object"){
 			for(var type in src.datatype)
 				if(obj instanceof src.datatype[type])
-					return type+": "+obj.toString().value;
+					return type+": "+new src.datatype.string(obj).value;
 			for(var key in obj)
 				obj[key] = arguments.callee(obj[key]);
 			return obj;
@@ -23,26 +22,46 @@ start = _ sl:statement* {
 	})(a(sl).map(function(s){ return s(); }));
 };
 
+_ = &{ return src.predicate.whitespace(this); };
+
 statement
 	= "{" _ sl:statement*  "}" _
 		{ return a(sl).map(function(s){ return s(); }) }
+	| d:declaration ";" _
+		{ return d(); }
 	| "if" _ "(" _ c:expression ")" _ t:statement ("else" _ e:statement)?
-		{ return new src.datatype.boolean(c(),"boolean").value ? t() : e && e(); }
+		{ return boolean(c()) ? t() : e && e(); }
+	| "while" _ "(" _ c:expression ")" _ t:statement
+		{ var l=[]; while(boolean(c())) l.push(t()); return l; }
+	| "do" _ "(" _ c:expression ")" _ t:statement
+		{ var l=[]; do l.push(); while (boolean(c())); return l; }
+	| "for" _ "(" _ d:declaration ";" _ c:expression ";" _ i:expression ")" _ s:statement
+		{ var l=[]; for(d();boolean(c());i()) l.push(s()); return l; }
 	| exp:expression ";" _ { return exp(); }
 
-_ = whitespace* ;
+declaration
+	= type: &{ return src.predicate.declaration(this); } left:identifier "=" _ right:expression
+		("," _ left:identifier "=" _ right:expression)*
+		{
+			left = a(left), right = a(right);
+			for(var i=0; i<left.length; ++i)
+				src.memory.new(left[i](),type,right[i]());
+			return null;
+		}
 
-whitespace
-	= [ \t\n\r\v]
-	| "//" &{ return src.predicate.ignoretill(this,"\n",false); } // single line comments
-	| "/*" &{ return src.predicate.ignoretill(this,"*/",true); } // multi line comments
+expression = e:exp_assign ("," _ e:exp_assign)*
+	{ return a(e).map(function(e){ return e(); }).pop(); };
 
-expression = exp_ternary;
-
-exp_assign = (left:identifier operator:op_assign _)* right:exp_ternary;
+exp_assign = (left:identifier operator:op_assign _)* right:exp_ternary
+	{
+		left = a(left); operator = a(operator);
+		for(var i=0, name, value = right(); i<left.length && (name=left[i]()); ++i)
+			if(operator[i]==="=") src.memory.set(name, value);
+			else src.memory.set(name, value=src.operator(operator[i].slice(0,-1),src.memory.get(name),value) );
+		return value;
+	};
 exp_ternary = c:exp_binary (i:"?" _ t:expression ":" _ e:expression)?
-	{ return !i ? c():( new src.datatype.boolean(c()).value ? t() : e() ); };
-
+	{ return !i ? c():( boolean(c()) ? t() : e() ); };
 exp_binary
 	= value:exp_unary (operator:op_binary _ value:exp_unary)*
 		{
@@ -63,20 +82,20 @@ exp_primary
 	= boolean
 	| number
 	| string
-	| identifier // avoid conflicts with keywords, use a predicate here
+	| name:identifier /* avoid conflicts with keywords, use a predicate here */
+		{ return src.memory.get(name()); }
 
-identifier = char:[$_A-Z]i char:[$_A-Z0-9]i + { return a(char).join(''); };
+identifier = char:[$_A-Z]i char:[$_A-Z0-9]i * _ { return a(char).join(''); };
 
 // Operators
 
-op_assign = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "|=" | "^=" | "&=" ;
+op_assign = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "**=" ;
 
 op_binary
-	= [+*-/%|^&] // arithmatic & bitwise
+	= "+" | "-" | "*" | "/" | "%" | "**" // arithmatic
 	| "==" | "!=" | "===" | "!==" // equality
 	| "<" | ">" | "<=" | ">=" // comparison
 	| "&&" | "||" // logical
-	| "**" // special
 	;
 
 op_unary = "!" / "-";
@@ -86,4 +105,4 @@ op_unary = "!" / "-";
 boolean = str:("true"|"false") _ { return new src.datatype.boolean(str); }
 number = (sign:[+-] _)?? (digit:[0-9])+ _ { return new src.datatype.integer(a(sign).concat(a(digit)).join('')); };
 string = &'"' data:&{ return src.predicate.literal(this); } _ { return new src.datatype.string(data); };
-regexp = &"/" data:&{ return src.predicate.literal(this); } flags:[igm]* _ { return 0 && src.datatype.regexp(data,flags); };
+// regexp = &"/" data:&{ return src.predicate.literal(this); } flags:[igm]* _ { return 0 && src.datatype.regexp(data,flags); };

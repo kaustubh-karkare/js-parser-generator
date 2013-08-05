@@ -11,7 +11,7 @@ var Parser = function(grammar,config){
 		debug: false,
 		partial: false, // does the complete input string need to be consumed?
 		unwrap: true, // where possible, should array wrappers be removed?
-		lazyeval: false // should functions to evaluate be returned instead of results of evalution?
+		lazyeval: false // should the evaluation functions be returned instead of results?
 	};
 	if(!config || typeof(config)!=="object") config = {};
 	for(var key in config) if(key in this.config) this.config[key] = !!config[key];
@@ -23,7 +23,7 @@ var Parser = function(grammar,config){
 	var code = "";
 	if(tlist.peek() && tlist.peek().type==="code")
 		code = tlist.next().data;
-	this.init = eval("(function(args){ " + code + "return function(code){ return eval(code); }; })");
+	this.init = eval("(function(args){" + code + "return function(code){ return eval(code); }; })");
 
 	// parse the (remaining) grammer file, add each item to this.production
 	var p, first;
@@ -56,10 +56,13 @@ var Parser = function(grammar,config){
 
 Parser.prototype.parse = function(data,args){
 	var state = new State(this,data);
+
+	// Set Up Execution Environment
 	var context = { "config": util.clone(this.config), "data": data };
-	state.env = this.init.call( context, Array.isArray(args)?args:[] ); // Set Up Execution Environment
-	state.context = context;
-	var ast = this.start.match(state); // Syntactically analyze the given data
+	state.env = this.init.call( state.context = context, Array.isArray(args)?args:[] );
+
+	// Syntactically analyze the given data, and return the result
+	var ast = this.start.match(state);
 	ast && (ast.eval.ast = ast);
 	return this.config.lazyeval ? ast && ast.eval : ast && ast.eval();
 };

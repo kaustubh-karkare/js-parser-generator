@@ -129,6 +129,7 @@ module.exports = {
 		if(this.greedy){
 			while(local.next && local.list.length < this.maximum){
 				state.log(2,"<loop>",this.pattern,this.maximum,this.greedy,local);
+				// only if a restoration process after a mismatch is not ongoing
 				if(state.redirect.length===0){
 					// save the decision to do one thing
 					local.next = false;
@@ -137,8 +138,14 @@ module.exports = {
 				}
 				// then do the opposite
 				temp = this.pattern.match(state);
-				if(temp===null) local = state.local(local);
-				else local.list.push(temp);
+				if(temp===null){
+					state.top( local = state.local(local) );
+					if(local===null){
+						state.log("</loop>","mismatch");
+						state.pop();
+						return null;
+					}
+				} else local.list.push(temp);
 			}
 		} else { // if not greedy
 			state.log(2,"<loop>",this.pattern,this.maximum,this.greedy,local);
