@@ -11,10 +11,12 @@ var Parser = function(grammar,config){
 		debug: false,
 		partial: false, // does the complete input string need to be consumed?
 		unwrap: true, // where possible, should array wrappers be removed?
-		lazyeval: false // should the evaluation functions be returned instead of results?
+		lazyeval: false, // should the evaluation functions be returned instead of results?
+		async: false, // should the last argument to every action function be a callback?
 	};
 	if(!config || typeof(config)!=="object") config = {};
 	for(var key in config) if(key in this.config) this.config[key] = !!config[key];
+	if(!this.config.lazyeval) this.config.async = false; // async requires lazyeval enabled
 
 	var tp = this.production = {};
 	var tlist = tokenize(grammar);
@@ -24,6 +26,7 @@ var Parser = function(grammar,config){
 	if(tlist.peek() && tlist.peek().type==="code")
 		code = tlist.next().data;
 	this.init = eval("(function(args){" + code + "return function(code){ return eval(code); }; })");
+	// assumption: the initialization code does not contain a premature return statement
 
 	// parse the (remaining) grammer file, add each item to this.production
 	var p, first;
@@ -48,7 +51,7 @@ var Parser = function(grammar,config){
 	if(!this.config.partial){
 		// add a predicate (and additional necessary patterns) to check for completion
 		var check = "{ this.error = 'Incomplete'; return this.index===this.data.length; }";
-		var action = "{ return $"+(this.config.lazyeval?"()":"")+"; }";
+		var action = "{ return $"+(this.config.lazyeval?this.config.async?"(callback)":"()":"")+"; }";
 		var temp = new pattern.and([ new pattern.label("$",this.start), new pattern.predicate(true,check) ]);
 		this.start = new pattern.production("$", null, new pattern.action(temp,action), ["$"]);
 	}

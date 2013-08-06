@@ -197,8 +197,7 @@ module.exports = {
 		state.log(2,"<action>");
 		var temp = this.pattern.match(state);
 		if(temp){
-			var le = state.parser.config.lazyeval;
-			var last = only("eval",state.labelled[state.labelled.length-1],!le);
+			var last = only("eval",state.labelled[state.labelled.length-1],!state.parser.config.lazyeval);
 			if(state.parser.config.unwrap) last = unwrap(last);
 			temp = new ast({
 				"str": only("str",temp),
@@ -206,7 +205,7 @@ module.exports = {
 				"env": state.env,
 				"context": state.context,
 				"code": this.code,
-				"lazyeval": le
+				"async": state.parser.config.async,
 			});
 		}
 		state.log(2,"</action>",temp);
@@ -249,13 +248,13 @@ module.exports = {
 
 var custom = function(data){ this.data = data; };
 
-var only = function(attr,data,e){
+var only = function(attr,data,evalnow){
 	if(typeof(data)==="string") return data;
-	else if(data instanceof ast) return e ? data[attr]() : data[attr];
+	else if(data instanceof ast) return evalnow ? data[attr]() : data[attr];
 	else if(data instanceof custom) return data.data;
 	else if(typeof(data)==="object" && data!==null){
 		var result = Array.isArray(data) ? [] : {};
-		for(var key in data) result[key] = arguments.callee(attr,data[key],e);
+		for(var key in data) result[key] = arguments.callee(attr,data[key],evalnow);
 		return result;
 	}
 };

@@ -54,6 +54,8 @@ var build_and = function(tlist, toplevel, labels){
 
 		// labels
 		if(next.type==="identifier" && tlist.peek(2) && tlist.peek(2).match("operator",":")){
+			if(next.data==="this" || next.data==="args" || next.data==="")
+				throw new Error("Reserved Identifier: Cannot use as label.");
 			if(labels.indexOf(next.data)===-1) labels.push(next.data);
 			prefix.push(next);
 			tlist.next(); tlist.next();

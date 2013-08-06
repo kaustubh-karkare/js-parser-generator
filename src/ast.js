@@ -9,6 +9,8 @@ var ast = function(args){
 	this.context = args.context;
 	this.eval = args.env(
 		"(function(){" + (args.lazyeval?"":"var args = Array.prototype.slice.call(arguments);") +
+		(args.async ? " var callback = args.pop(); if(typeof(callback)!==\"function\") " +
+			"throw new Error(\"Callback Not Provided!\"); " : "") +
 		"return (function(" + labels.join(",") + ")" + args.code + ").apply(this.context,[" +
 		labels.map(function(x){ return "this.data."+x; }).join(",") + "]); })"
 	).bind(this);

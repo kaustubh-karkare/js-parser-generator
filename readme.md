@@ -2,7 +2,8 @@
 ## JavaScript Parser Generator
 
     node test/basic # basic grammar constructs
-    node test/program # a simple programming language
+    node test/async # asynchronous evaluation of patterns
+    node test/program # a very simple programming language
 
 ## Usage
 
