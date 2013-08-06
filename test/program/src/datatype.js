@@ -54,16 +54,16 @@ datatype.integer = function(lib){
 	n.ninf = new n("-Infinity");
 	var unary = { "-":"neg" };
 	var binary = {
-		"+":"add","-":"sub","*":"mul","/":"div","%":"mod", "**":"pow",
+		"+":"add","-":"sub","*":"mul","/":"div","%":"mod",
 		"<":"lt", "<=": "lte", ">":"gt", ">=":"gte", "==":"eq", "!=":"neq"
 	};
 	n.prototype.operator = function(operator,that){
-		var temp = that===undefined ? unary[operator] : binary[operator];
+		var temp = (that===undefined ? unary[operator] : binary[operator]);
 		if(!temp) throw new Error("datatype.integer.operation.not-implemented");
 		if(typeof(temp)==="string") temp = this.value[temp](that && that.value);
 		else if(typeof(temp)==="function") temp = temp.call(this,that);
 		if(temp instanceof bigint) return new n(temp);
-		else if(typeof(temp)==="boolean") return datatype.boolean[temp];
+		else return datatype.boolean[temp];
 	};
 	return n;
 };

@@ -73,7 +73,8 @@ exp_unary
 	| (op:op_unary _)? val:exp_primary {
 		switch(op){
 			case "!": return new src.datatype.boolean(val()).operator("!");
-			case "-": return new src.datatype.integer(val()).operator("-")
+			case "+": return new src.datatype.integer(val());
+			case "-": return new src.datatype.integer(val()).operator("-");
 			default: return val()
 		}
 	}
@@ -92,17 +93,19 @@ identifier = char:[$_A-Z]i char:[$_A-Z0-9]i * _ { return a(char).join(''); };
 op_assign = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "**=" ;
 
 op_binary
-	= "+" | "-" | "*" | "/" | "%" | "**" // arithmatic
+	= "+" | "-" | "*" | "/" | "%" // arithmatic
 	| "==" | "!=" | "===" | "!==" // equality
 	| "<" | ">" | "<=" | ">=" // comparison
 	| "&&" | "||" // logical
 	;
 
-op_unary = "!" / "-";
+op_unary = "!" / "+" / "-";
 
 // Datatypes
 
 boolean = str:("true"|"false") _ { return new src.datatype.boolean(str); }
-number = (sign:[+-] _)?? (digit:[0-9])+ _ { return new src.datatype.integer(a(sign).concat(a(digit)).join('')); };
 string = &'"' data:&{ return src.predicate.literal(this); } _ { return new src.datatype.string(data); };
 // regexp = &"/" data:&{ return src.predicate.literal(this); } flags:[igm]* _ { return 0 && src.datatype.regexp(data,flags); };
+number = (digit:[0-9])+ _ { return new src.datatype.integer(a(digit).join('')); }
+	| "NaN" _ { return src.datatype.integer.nan; }
+	| "Infinity" _ { return src.datatype.integer.pinf; }

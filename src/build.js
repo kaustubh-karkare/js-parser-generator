@@ -90,7 +90,7 @@ var build_and = function(tlist, toplevel, labels){
 			if(loop==="?") item = new pattern.or( greedy ? [item,new pattern.empty()] : [new pattern.empty(),item] );
 			else if(loop==="*") item = new pattern.loop( item, 9999, greedy );
 			else if(loop==="+") item = new pattern.and([ item, new pattern.loop(item,9999,greedy) ]);
-		}
+		} else loop = null;
 
 		// prefix operators are applied at last
 		while(prefix.length){

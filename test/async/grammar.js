@@ -22,16 +22,16 @@
 	};
 }
 
-expression = exp:exp_add { exp(callback); };
+expression = exp_add;
 
 _ = [ \t\n]* ;
 
 exp_add = left:exp_mul (op:("+"/"-") _ right:exp_mul)*
 	{ evaluate(left,op,right,callback); }
 
-exp_mul = left:exp_unary (op:("*"/"/"/"%") _ right:exp_unary)*
+exp_mul = left:primary (op:("*"/"/"/"%") _ right:primary)*
 	{ evaluate(left,op,right,callback); }
 
-exp_unary = "(" _ exp:expression ")" _ { exp(callback); }
+primary = "(" _ exp:expression ")" _ { exp(callback); }
 	| d:[0-9]+ _ { callback(null,parseInt(a(d).join(''))); }
 	| "input" _ { input("Enter a Number: ",function(data){ callback(null,parseInt(data)); }); }

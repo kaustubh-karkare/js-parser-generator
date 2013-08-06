@@ -12,7 +12,6 @@ slot = the maximum value that can be stored in an array element
 alnum = recognized alphanumeric characters in the number's string representation
 
 TODO List
-	Handle [+-]Infinity & NaN in all public functions.
 	Refactor the bit-shift functions to be able to handle arrays, in addition to integers.
 	Improve Memory Utilization: Use the specialized Int16Array instead of normal arrays.
 */
@@ -162,12 +161,9 @@ var calc = {
 	},
 	divide : function(a,b){ return this.divmod(a,b)[0]; },
 	modulus : function(a,b){ return this.divmod(a,b)[1]; },
-	power : function(a,b){ // assumption: a>0
-		if(!b.length) return bigint[1].d;
-		var x = this.power( this.multiply(a,a), this.rightShift(b,1) );
-		return b[0]&1 ? this.multiply(x,a) : x;
-	}
 };
+
+var special = function(x){ return x.d? null : x.s>0? "+inf" : x.s<0 ? "-inf" : "nan"; };
 
 bigint.prototype = {
 	"toNumber": function(){
@@ -183,11 +179,19 @@ bigint.prototype = {
 		return (this.s===-1?"-":"")+conv.array2str( this.d, alnum.slice(0,base) );
 	},
 	"negative": function(){
-		if(this.s) this.s *= -1;
-		return this;
+		var that = new bigint(this);
+		if(that.s) that.s *= -1;
+		return that;
 	},
 	"add": function(b){
 		var a = this, c = new bigint(this);
+		var sa = special(a), sb = special(b);
+		if(sa || sb)
+			if(sa==="nan" || sb==="nan" || sa==="+inf" && sb==="-inf" || sa==="-inf" && sb==="+inf")
+				return bigint.nan;
+			else if(sa==="+inf" || sb==="+inf") return bigint.pinf;
+			else if(sa==="-inf" || sb==="-inf") return bigint.ninf;
+			else throw new Error("Meow");
 		if(a.s===b.s) c.d = calc.add(a.d,b.d);
 		else {
 			var z = calc.compare(a.d,b.d);
@@ -198,37 +202,48 @@ bigint.prototype = {
 		return c;
 	},
 	"subtract": function(that){
+		that = new bigint(that);
 		that.s *= -1;
 		var diff = this.add(that);
 		that.s *= -1;
 		return diff;
 	},
 	"multiply": function(that){
+		var sa = special(this), sb = special(that);
+		if(sa || sb)
+			if(sa==="nan" || sb==="nan") return bigint.nan;
+			else if((sa==="-inf")^(sb==="-inf")) return bigint.ninf;
+			else return bigint.pinf;
 		if(!this.d.length || !that.d.length) return bigint[0];
 		else return new bigint({"d":calc.multiply(this.d,that.d),"s":this.s*that.s});
 	},
 	"dividedBy": function(that){
+		var sa = special(this), sb = special(that);
+		if(sa || sb)
+			if(sa==="nan" || sb==="nan" || sa && sb) return bigint.nan;
+			else if(sa==="+inf" && !sb) return bigint.pinf;
+			else if(sa==="-inf" && !sb) return bigint.ninf;
+			else if(!sa && sb) return bigint[0];
 		if(!that.d.length) return !this.d.length ? bigint.nan : (this.s ? bigint.pinf : bigint.ninf);
 		else return !this.d.length ? bigint[0] :
 			new bigint({"d":calc.divide(this.d,that.d), "s":this.s*that.s});
 	},
 	"modulus": function(that){
+		var sa = special(this), sb = special(that);
+		if(sa || sb)
+			if(sa==="nan" || sb==="nan") return bigint.nan;
+			else if(!sa && sb) return this;
+			else if(sa) return bigint.nan;
 		return that.d.length===0 ? bigint.nan : this.d.length===0 ? bigint[0] :
 			new bigint({"d":calc.modulus(this.d,that.d), "s":this.s});
 	},
-	"power": function(that){
-		return new bigint({
-			"d": calc.power(this.d,that.d),
-			"s": (that.d[0]&1)&&(this.s===-1) ? -1 : 1
-		});
-	},
 	// Comparison Operators
-	"equalTo": function(that){ var diff = this.subtract(that); return !diff.d.length; },
-	"lessThan": function(that){ var diff = this.subtract(that); return diff.s<0 && diff.d.length>0; },
-	"greaterThan": function(that){ var diff = this.subtract(that); return diff.s>0 && diff.d.length>0; },
-	"notEqualTo": function(that){ return !this.equalTo(that); },
-	"lessThanOrEqualTo": function(that){ return !this.greaterThan(that); },
-	"greaterThanOrEqualTo": function(that){ return !this.lessThan(that); },
+	"equalTo": function(that){ var diff = this.subtract(that); return diff.s && diff.d && !diff.d.length; },
+	"lessThan": function(that){ var diff = this.subtract(that); return diff.s<0 && (!diff.d || diff.d.length); },
+	"greaterThan": function(that){ var diff = this.subtract(that); return diff.s>0 && (!diff.d || diff.d.length); },
+	"notEqualTo": function(that){ var diff = this.subtract(that); return !diff.s || !diff.d || diff.d.length; },
+	"lessThanOrEqualTo": function(that){ var diff = this.subtract(that); return diff.s<0 || diff.d && !diff.d.length; },
+	"greaterThanOrEqualTo": function(that){ var diff = this.subtract(that); return diff.s>0 || diff.d && !diff.d.length; },
 };
 
 var shortname = {

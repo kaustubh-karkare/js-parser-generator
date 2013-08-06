@@ -17,6 +17,7 @@ var config = {"lazyeval":1,"async":1}, args = [require("./lib/async"),input];
 var pg = require("../../src"),
 	parser = pg.buildParser(grammar,config),
 	result = parser.parse(code,args);
+	
 console.log(code);
 result(function(error,result){
 	console.log(result);
