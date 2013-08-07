@@ -128,9 +128,9 @@ module.exports = {
 		var temp, k;
 		if(this.greedy){
 			while(local.next && local.list.length < this.maximum){
-				state.log(2,"<loop>",this.pattern,this.maximum,this.greedy,local);
+				state.log(2,"<loop>",this.pattern,this.minimum,this.maximum,this.greedy,local);
 				// only if a restoration process after a mismatch is not ongoing
-				if(state.redirect.length===0){
+				if(local.list.length >= this.minimum && state.redirect.length===0){
 					// save the decision to do one thing
 					local.next = false;
 					state.save();
@@ -148,7 +148,17 @@ module.exports = {
 				} else local.list.push(temp);
 			}
 		} else { // if not greedy
-			state.log(2,"<loop>",this.pattern,this.maximum,this.greedy,local);
+			state.log(2,"<loop>",this.pattern,this.minimum,this.maximum,this.greedy,local);
+			// initially match the minimum number of times
+			while(local.list.length < this.minimum){
+				temp = this.pattern.match(state);
+				if(temp===null){
+					state.log("</loop>","mismatch");
+					state.pop(); // pop localdata
+					return state.local(); // pop null
+				} else local.list.push(temp);
+			}
+			// then optionally add more
 			if(local.list.length<this.maximum){
 				temp = this.pattern.match( clone = state.clone() );
 				if(temp!==null){

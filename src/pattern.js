@@ -48,9 +48,10 @@ var pattern = {
 		this.options = options;
 	},
 
-	"loop" : function(pattern, maximum, greedy){
+	"loop" : function(pattern, minimum, maximum, greedy){
 		if(debug) this.type = "loop";
 		this.pattern = pattern;
+		this.minimum = minimum;
 		this.maximum = maximum;
 		this.greedy = greedy;
 	},

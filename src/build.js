@@ -87,9 +87,9 @@ var build_and = function(tlist, toplevel, labels){
 		if(next.type==="operator" && (next.data==="?" || next.data==="*" || next.data==="+") ){
 			loop = tlist.next().data;
 			greedy = !( (next = tlist.peek()) && next.match("operator","?") && tlist.next() );
-			if(loop==="?") item = new pattern.or( greedy ? [item,new pattern.empty()] : [new pattern.empty(),item] );
-			else if(loop==="*") item = new pattern.loop( item, 9999, greedy );
-			else if(loop==="+") item = new pattern.and([ item, new pattern.loop(item,9999,greedy) ]);
+			if(loop==="?") item = new pattern.loop( item, 0, 1, greedy );
+			else if(loop==="*") item = new pattern.loop( item, 0, Infinity, greedy );
+			else if(loop==="+") item = new pattern.loop( item, 1, Infinity, greedy );
 		} else loop = null;
 
 		// prefix operators are applied at last
