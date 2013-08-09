@@ -37,18 +37,19 @@ var pg = require("../../src/"), timer;
 
 var grammar = filedata("./grammar.js");
 timer = Timer();
-var parser = pg.buildParser(grammar,{ debug:0, lazyeval:1 });
+var parser = pg.buildParser(grammar,{ debug:0, lazyeval:1, async:1 });
 print("Generated Parser ("+timer()+")",parser,0);
 
 var program = filedata("code.js");
 print("Input Program",program,1);
 
 timer = Timer();
-var data = {};
-var syntaxtree = parser.parse(program,[requiredir("lib"),requiredir("src"),data]);
+var args = [requiredir("lib"),requiredir("src"),{}];
+var syntaxtree = parser.parse(program,args);
 print("Syntax Tree ("+timer()+")",syntaxtree.ast,0);
 
 timer = Timer();
-var result = syntaxtree();
-print("Execution Result ("+timer()+")",result,2);
-// print("Program Data",data,2);
+syntaxtree(function(error,result){
+	print("Execution Result ("+timer()+")",error || result,2);
+	// print("Program Data",args[2],2);
+});

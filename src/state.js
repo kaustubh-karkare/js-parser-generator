@@ -10,6 +10,9 @@ var State = function(parser,data){
 	this.labelled = [];
 	this.alternative = [];
 	this.redirect = [];
+
+	this.errorpos = -1;
+	this.expected = [];
 };
 
 module.exports = State;
@@ -64,6 +67,14 @@ State.prototype.match = function(unit){
 };
 
 State.prototype.mismatch = function(unit){
+	// remember expected units
+	if(this.index > this.errorpos){
+		this.errorpos = this.index;
+		this.expected = [];
+	}
+	if(unit && this.expected.indexOf(unit)===-1)
+		this.expected.push(unit);
+	// redirect initialization
 	if(this.alternative.length===0){
 		for(var i=0; i<this.localdata.length; ++i)
 			this.redirect.push(null);

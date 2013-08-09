@@ -60,14 +60,17 @@ var Parser = function(grammar,config){
 Parser.prototype.parse = function(data,args){
 	var state = new State(this,data);
 
-	// Set Up Execution Environment
+	// Set Up Execution Environment.
 	var context = { "config": util.clone(this.config), "data": data };
 	state.env = this.init.call( state.context = context, Array.isArray(args)?args:[] );
+	// A basic test to prevent return statements in the initialization block. Not fool-proof.
+	if(typeof(state.env)!=="function" || state.env("(function(x){ return x; })")(context)!==context)
+		throw new Error("Premature Termination of Initialization Block");
 
-	// Syntactically analyze the given data, and return the result
-	var ast = this.start.match(state);
-	ast && (ast.eval.ast = ast);
-	return this.config.lazyeval ? ast && ast.eval : ast && ast.eval();
+	// Syntactically analyze the given data, and return the result.
+	var root = this.start.match(state);
+	if(!root) throw new Error("Expected at index "+state.errorpos+": ["+state.expected.join(", ")+"]");
+	return this.config.lazyeval ? root : root();
 };
 
 module.exports = Parser;

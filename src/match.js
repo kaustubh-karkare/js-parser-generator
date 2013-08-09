@@ -1,6 +1,4 @@
 
-var ast = require("./ast");
-
 module.exports = {
 
 	// Root Node
@@ -207,16 +205,18 @@ module.exports = {
 		state.log(2,"<action>");
 		var temp = this.pattern.match(state);
 		if(temp){
-			var last = only("eval",state.labelled[state.labelled.length-1],!state.parser.config.lazyeval);
+			var last = state.labelled[state.labelled.length-1];
+			last = prepare(last,!state.parser.config.lazyeval);
 			if(state.parser.config.unwrap) last = unwrap(last);
-			temp = new ast({
-				"str": only("str",temp),
+			var args = {
 				"data": last,
 				"env": state.env,
 				"context": state.context,
 				"code": this.code,
-				"async": state.parser.config.async,
-			});
+				"config": state.parser.config,
+			};
+			temp = node(args);
+			// TODO: Attach internal string data to the AST functions for predicates
 		}
 		state.log(2,"</action>",temp);
 		return temp;
@@ -225,12 +225,12 @@ module.exports = {
 	"predicate" : function(state){
 		state.log(2,"<predicate>",this.labels,this.code);
 		while(true){
-			var last = only("str",state.labelled[state.labelled.length-1]);
+			var last = prepare(state.labelled[state.labelled.length-1],false);
 			if(state.parser.config.unwrap) last = unwrap(last);
 			var that = {
 				index: state.index, // if increased, will cause state.index to increase too
 				result: null, // the string returned to the calling function
-				error: "Predicate Failure" // default error message
+				expected: null // expected pattern, which was not found
 			};
 
 			for(var key in that) state.context[key] = that[key];
@@ -245,10 +245,10 @@ module.exports = {
 			state.log(2,"</predicate>",result,that.result);
 			if(this.positive === !!result){
 				if(that.index>state.index) state.index = that.index;
-				return that.result ? new custom(that.result) : "";
+				return that.result!==null ? new custom(that.result) : "";
 			} else {
 				if(state.redirect.length>0) return null;
-				state.mismatch(that.error);
+				state.mismatch(that.expected);
 				if(state.redirect[0]===null) return state.local();
 			}
 		}
@@ -256,22 +256,38 @@ module.exports = {
 
 };
 
+var node = function(args){
+	var labels = Object.keys(args.data);
+	return args.env(
+		"(function(){" + (args.config.lazyeval?"var args = Array.prototype.slice.call(arguments);":"") +
+		(args.config.async ? " var callback = args.pop(); if(typeof(callback)!==\"function\") " +
+			"throw new Error(\"Callback Not Provided!\"); " : "") +
+		"return (function(" + labels.join(",") + ")" + args.code + ").apply(this.context,[" +
+		labels.map(function(x){ return "this.data."+x; }).join(",") + "]); })"
+	).bind(args);
+};
+
+// Used to wrap the data provided by the user through predicates
+// to prevents the evalnow function from traversing it.
 var custom = function(data){ this.data = data; };
 
-var only = function(attr,data,evalnow){
+// Used to collect data before being provided as arguments to actions & predicates.
+var prepare = function(data,evalnow){
 	if(typeof(data)==="string") return data;
-	else if(data instanceof ast) return evalnow ? data[attr]() : data[attr];
+	else if(typeof(data)==="function") return evalnow ? data() : data;
 	else if(data instanceof custom) return data.data;
 	else if(typeof(data)==="object" && data!==null){
-		var result = Array.isArray(data) ? [] : {};
-		for(var key in data) result[key] = arguments.callee(attr,data[key],evalnow);
+		var result = Array.isArray(data) ? new Array(data.length) :{};
+		for(var key in data) result[key] = arguments.callee(data[key],evalnow);
 		return result;
 	}
 };
 
 var unwrap = function(data){
+	var result = {};
 	for(var key in data)
-		if(data[key].length===0) data[key] = null;
-		else if(data[key].length===1) data[key] = data[key][0];
-	return data;
-}
+		if(data[key].length===0) result[key] = null;
+		else if(data[key].length===1) result[key] = data[key][0];
+		else result[key] = data[key];
+	return result;
+};

@@ -84,7 +84,7 @@ var build_and = function(tlist, toplevel, labels){
 
 		// first consume loop suffixes
 		next = tlist.peek();
-		if(next.type==="operator" && (next.data==="?" || next.data==="*" || next.data==="+") ){
+		if(next && next.type==="operator" && (next.data==="?" || next.data==="*" || next.data==="+") ){
 			loop = tlist.next().data;
 			greedy = !( (next = tlist.peek()) && next.match("operator","?") && tlist.next() );
 			if(loop==="?") item = new pattern.loop( item, 0, 1, greedy );

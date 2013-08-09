@@ -10,10 +10,6 @@ bits = number of bits to be used for storage in an integer value
 intmax = maximum integer value beyond which storage becomes imprecise
 slot = the maximum value that can be stored in an array element
 alnum = recognized alphanumeric characters in the number's string representation
-
-TODO List
-	Refactor the bit-shift functions to be able to handle arrays, in addition to integers.
-	Improve Memory Utilization: Use the specialized Int16Array instead of normal arrays.
 */
 
 var bits = 26, intmax = 1<<53, slot = 1<<bits;
@@ -32,7 +28,7 @@ var bigint = function(init,init2){
 			this.d = conv.int2array(Math.floor(init)); // ignoring non-integral part
 		}
 	} else if(typeof(init)==="string"){
-		if(init==="+Infinity"){ this.s = 1; this.d = null; }
+		if(init==="Infinity" || init==="+Infinity"){ this.s = 1; this.d = null; }
 		else if(init==="-Infinity"){ this.s = -1; this.d = null; }
 		else if(init==="NaN"){ this.s = null; this.d = null; }
 		else {
@@ -224,7 +220,7 @@ bigint.prototype = {
 			else if(sa==="+inf" && !sb) return bigint.pinf;
 			else if(sa==="-inf" && !sb) return bigint.ninf;
 			else if(!sa && sb) return bigint[0];
-		if(!that.d.length) return !this.d.length ? bigint.nan : (this.s ? bigint.pinf : bigint.ninf);
+		if(!that.d.length) return !this.d.length ? bigint.nan : (this.s===1 ? bigint.pinf : bigint.ninf);
 		else return !this.d.length ? bigint[0] :
 			new bigint({"d":calc.divide(this.d,that.d), "s":this.s*that.s});
 	},
@@ -276,28 +272,26 @@ module.exports = bigint;
 
 
 
-// Testing
-
-if(0){
-	console.log(bigint(2).pow(bigint(11)).str());
-	var factorial = function(x){ return x.eq(bigint[1])?x:x.mul(factorial(x.sub(bigint[1]))); };
-	var intmaxsqrt = Math.floor(Math.sqrt(intmax));
-	test: for(var i=0,j,k; ;++i){
-		var a = Math.floor(Math.random()*intmaxsqrt);
-		var b = Math.floor(Math.random()*intmaxsqrt);
-		var c = Math.floor(Math.random()*intmax);
-		var ba = new bigint(a), bb = new bigint(b), bc = new bigint(c);
-		
-		j = 0;
-		if( a+b + "" !== ba.add(bb).str() ) break; else ++j;
-		if( a-b + "" !== ba.sub(bb).str() ) break; else ++j;
-		if( a*b + "" !== ba.mul(bb).str() ) break; else ++j;
-		if( Math.floor(c/a)+"" !== bc.div(ba).str() ) break; else ++j;
-		if( c%a+"" !== bc.mod(ba).str() ) break; else ++j;
-		if( (a<b) !== (ba.lt(bb)) ) break; else ++j;
-		if( (a>b) !== (ba.gt(bb)) ) break; else ++j;
-		if( (a==b) !== (ba.eq(bb)) ) break; else ++j;
-		console.log("Match",a,b,c);
-	}
-	console.log("Mismatch",a,b,c,j);
+/*
+console.log(bigint(2).pow(bigint(11)).str());
+var factorial = function(x){ return x.eq(bigint[1])?x:x.mul(factorial(x.sub(bigint[1]))); };
+var intmaxsqrt = Math.floor(Math.sqrt(intmax));
+test: for(var i=0,j,k; ;++i){
+	var a = Math.floor(Math.random()*intmaxsqrt);
+	var b = Math.floor(Math.random()*intmaxsqrt);
+	var c = Math.floor(Math.random()*intmax);
+	var ba = new bigint(a), bb = new bigint(b), bc = new bigint(c);
+	
+	j = 0;
+	if( a+b + "" !== ba.add(bb).str() ) break; else ++j;
+	if( a-b + "" !== ba.sub(bb).str() ) break; else ++j;
+	if( a*b + "" !== ba.mul(bb).str() ) break; else ++j;
+	if( Math.floor(c/a)+"" !== bc.div(ba).str() ) break; else ++j;
+	if( c%a+"" !== bc.mod(ba).str() ) break; else ++j;
+	if( (a<b) !== (ba.lt(bb)) ) break; else ++j;
+	if( (a>b) !== (ba.gt(bb)) ) break; else ++j;
+	if( (a==b) !== (ba.eq(bb)) ) break; else ++j;
+	console.log("Match",a,b,c);
 }
+console.log("Mismatch",a,b,c,j);
+*/

@@ -177,7 +177,7 @@ var tokenize = function(str){
 		// identifiers
 		} else if(varname1.indexOf(str[i].toUpperCase())!==-1){
 			current = str[i++];
-			while(varname2.indexOf(str[i].toUpperCase())!==-1) current += str[i++];
+			while(str[i] && varname2.indexOf(str[i].toUpperCase())!==-1) current += str[i++];
 			result.push( new Token("identifier",current) );
 
 		// operators
