@@ -125,6 +125,44 @@ datatype.string = function(lib,src,data,callback){
 	});
 };
 
+datatype.function = function(lib,src,data,callback){
+	var f = function(init,callback){
+		this.args = init.args;
+		this.body = init.body;
+		this.str = init.str;
+		src.memory.function.new((function(error,result){
+			if(!error) this.access = result;
+			callback(error, this);
+		}).bind(this));
+	};
+	f.prototype = {
+		"convert": function(type,callback){
+			if(type==="undefined") callback(null, src.datatype.undefined.instance);
+			else if(type==="boolean") callback(null, src.datatype.boolean.true );
+			else if(type==="integer") callback(null, src.datatype.integer.nan );
+			else if(type==="string") new src.datatype.string( this.str, callback );
+			else if(type==="function") callback(null, this);
+		},
+		"operator": function(op,that,callback){
+			if(op!=="()") return callback("src.datatype.function.operator.unrecognized");
+			lib.async.series([
+				src.memory.function.start.bind(null,this.access,this.args,that),
+				this.body
+			],function(error,result){
+				if(error) callback(error,result);
+				else src.memory.function.end(function(error2){
+					if(error2) callback(error2, result);
+					else callback(null, result[1]);
+				});
+			});
+		}
+	};
+	new f({"args":[],"body":function(){},"str":"[function:no-operation]"},function(e,r){
+		f.noop = r;
+		callback(null,f);
+	});
+};
+
 
 
 datatype.$operator = function(lib,src,data,callback){

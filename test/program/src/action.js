@@ -73,6 +73,16 @@ module.exports = function(lib,src,data,callback){
 								function(r,cb){ r.operator("-", null, cb); }
 							],fn);
 					}
+				} else if(post.length>0){
+					var next = post.shift();
+					switch(next.id){
+						case "()":
+							return result.operator(next.id, next, function(error,result){
+								if(error==="function.return")
+									fn(null,result[result.length-1]);
+								else callback(error,result);
+							});
+					}
 				} else callback(null,result);
 			};
 			val(fn);

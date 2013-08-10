@@ -6,7 +6,7 @@
 	order.forEach(function(name){ src[name] = src[name](lib,src,data); });
 
 	var init = function(callback){
-		var order = ["action","datatype","memory"];
+		var order = ["action","memory","datatype"];
 		lib.async.series(order.map(function(name){
 			return function(cb){
 				src[name](lib,src,data,function(e,result){
@@ -39,7 +39,18 @@ _1 = &{ return src.predicate.whitespace(this,1); }
 
 statements
 	= s:statement*
-		{ lib.async.series(a(s),callback); }
+		{
+			var list = [];
+			lib.async.series(a(s).map(function(s){
+				return function(cb){
+					s(function(e,r){
+						if(e==="function.return" || !e)
+							list.push(r);
+						cb(e);
+					});
+				};
+			}),function(e){ callback(e,list); });
+		}
 
 statement
 	= "{" _ s:statements  "}" _ { s(callback); }
@@ -59,13 +70,15 @@ statement
 				});
 			});
 		}
-	| "for" _ "(" _ declare:declaration ";" _ condition:expression ";" _ next:expression ")" _ then:statement
+	| "for" _ "(" _ declare:(declaration|expression) ";" _ condition:expression ";" _ next:expression ")" _ then:statement
 		{
 			declare(function(e){
 				if(e) callback(e);
 				else src.action.loop(condition,next,then,callback);
 			});
 		}
+	| "return" _ exp:expression ";" _
+		{ exp(function(error,result){ callback(error || "function.return", result) }); }
 
 declaration
 	= type:&{ return src.predicate.declaration(this); } left:identifier "=" _ right:exp_assign
@@ -74,7 +87,7 @@ declaration
 			left = a(left); right = a(right);
 			lib.async.series(left.concat(right),callback,function(result){
 				lib.async.series(result.slice(0,left.length).map(function(name,i){
-					return function(cb){ src.memory.new(name,type,result[i+left.length],cb); };
+					return function(cb){ src.memory.new(type,name,result[i+left.length],cb); };
 				}),callback);
 			});
 		}
@@ -128,7 +141,13 @@ op_suffix
 	= "++" _ | "--" _
 	| "." _ identifier
 	| "[" _ expression "]" _
-	| "(" _ (exp_assign ("," _ exp_assign)* )?
+	| "(" _ (exp:exp_assign ("," _ exp:exp_assign)* )? ")" _
+		{
+			lib.async.series(a(exp), callback, function(args){
+				args.id = "()";
+				callback(null,args);
+			});
+		}
 // pre/post increment operators require variables, not values
 // prefix operators have higher precendence
 // the new operator requires the current value to be a function & suffix operator to be a call
@@ -141,8 +160,8 @@ exp_primary
 		{ lib.async.waterfall([name,src.memory.get],callback); }
 	| function
 
-identifier = char:[$_A-Z]i char:[$_A-Z0-9]i * _ str:&{
-		var str = a(char).join('');
+identifier = char:[$_A-Z]i (char:[$_A-Z0-9]i)* _ str:&{
+		var str = a(char).join("");
 		if(keywords.indexOf(str)!==-1) return false;
 		this.result = str;
 		return true;
@@ -166,6 +185,18 @@ integer
 	| "Infinity" _
 		{ callback(null,src.datatype.integer["Infinity"]); }
 
+array
+	= "[" _ (item:expression ("," _ item:expression)*)? "]" _
+		{ callback("grammar.array"); }
+
 function
-	= "function" _ "(" _ (name:identifier ("," name:identifier)* )? ")" _ "{" _ body:statements "}" _
-		{ callback("grammar.function"); if(0) new src.datatype.function({ "args":a(name), "body":body }); }
+	= "function" start:&{ this.result=this.index-8; return true; } _ "(" _
+		(name:identifier ("," name:identifier)* )? ")" _ "{" _ body:statements "}"
+		end:&{ this.result=this.index; return true; } _
+		{
+			lib.async.series.call(this,a(name),callback,function(args){
+				new src.datatype.function({ "args":args, "body":body, "str":this.data.slice(start,end) },callback);
+			});
+		}
+
+//
