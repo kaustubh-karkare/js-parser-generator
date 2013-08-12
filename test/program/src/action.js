@@ -3,6 +3,22 @@ module.exports = function(lib,src,data,callback){
 
 	var result = {};
 
+	result.assignment = function(left,operator,right,callback){
+		lib.async.series(left.concat(right),callback,function(names){
+			var value = names.pop();
+			lib.async.series(names.reverse().map(function(name,i){
+				if(operator[i]==="=") return function(cb){ src.memory.set(name,value,cb); };
+				else return function(cb){
+					lib.async.waterfall([
+						function(cb2){ src.memory.get(name,cb2); },
+						function(current,cb2){ src.datatype.$operator(operator[i].slice(0,-1),current,value,cb2); },
+						function(next,cb2){ src.memory.set(name,value=next,cb2); }
+					],cb);
+				};
+			}),callback,function(){ callback(null,value); });
+		});
+	};
+
 	result.condition = function(condition, then, alt, callback){
 		condition(function(e,r){
 			if(e) callback(e);
@@ -52,14 +68,12 @@ module.exports = function(lib,src,data,callback){
 		fn(data,callback);
 	};
 
-	result.unary = function(pre,val,post,callback){
-		lib.async.series(pre.concat(post), callback, function(result){
-			pre = result.slice(0,pre.length);
-			post = result.slice(pre.length);
+	result.unary = function(operator,val,callback){
+		lib.async.series(operator, callback, function(operator){
 			var fn = function(error,result){
 				if(error) callback(error);
-				else if(pre.length>0){
-					switch(pre.pop()){
+				else if(operator.length){
+					switch(operator.pop()){
 						case "!":
 							return lib.async.waterfall([
 								function(cb){ result.convert("boolean", cb); },
@@ -72,22 +86,43 @@ module.exports = function(lib,src,data,callback){
 								function(cb){ result.convert("integer", cb); },
 								function(r,cb){ r.operator("-", null, cb); }
 							],fn);
-					}
-				} else if(post.length>0){
-					var next = post.shift();
-					switch(next.id){
-						case "()":
-							return result.operator(next.id, next, function(error,result){
-								if(error==="function.return")
-									fn(null,result[result.length-1]);
-								else callback(error,result);
-							});
+						case "typeof":
+							return new src.datatype.$gettype(result,callback);
+						case "void":
+							return callback(null,src.datatype.undefined.instance);
 					}
 				} else callback(null,result);
 			};
 			val(fn);
 		});
-	}
+	};
+
+	result.primary = function(pre,name,post,callback){
+		// var key = [name];
+		var fn = function(error,result){
+			if(error) callback(error);
+			else if(post.length){
+				var next = post[0];
+				switch(next.id){
+					case "[]":
+						if(typeof(result)==="string") return src.memory.get(result,fn);
+						else return result.operator(next.id, post.shift(), fn);
+					case "()":
+						if(typeof(result)==="string") return src.memory.get(result,fn);
+						else return result.operator(next.id, post.shift(), function(error,result){
+							if(error==="function.return")
+								fn(null,result[result.length-1]);
+							else fn(error,result);
+						});
+				}
+			} else {
+				if(typeof(result)==="string") return src.memory.get(result,fn);
+				else callback(null,result);
+			}
+		};
+		fn(null, name);
+		// src.memory.get(name,callback);
+	};
 
 	callback(null, result);
 };

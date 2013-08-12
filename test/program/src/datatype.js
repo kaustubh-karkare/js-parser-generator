@@ -55,8 +55,12 @@ datatype.boolean = function(lib,src,data,callback){
 
 datatype.integer = function(lib,src,data,callback){
 	var i = function(init,callback){
-		this.value = new lib.bigint(init);
-		callback(null, this);
+		try {
+			this.value = new lib.bigint(init);
+			callback(null, this);
+		} catch(e){
+			callback("src.datatype.integer.constructor.invalid");
+		}
 	};
 	var unary = { "-":"neg" };
 	var binary = {
@@ -88,6 +92,70 @@ datatype.integer = function(lib,src,data,callback){
 		if(!e) for(var key in result) i[key] = result[key];
 		callback(e,i);
 	});
+};
+
+datatype.array = function(lib,src,data,callback){
+	var a = function(init,callback){
+		this.value = init;
+		callback(null, this);
+	};
+	a.prototype = {
+		"convert": function(type,callback){
+			if(type==="undefined") callback(null, src.datatype.undefined.instance);
+			else if(type==="boolean") callback(null, src.datatype.boolean.true );
+			else if(type==="integer") callback(null, src.datatype.integer.nan );
+			else if(type==="array") callback(null, this);
+			else if(type==="string") lib.async.series(this.value.map(function(item){
+				return function(cb){ item.convert("string",cb); }
+			}),callback,function(list){
+				new src.datatype.string("["+list.map(function(i){ return JSON.stringify(i.value); }).join(",")+"]", callback);
+			});
+		},
+		"operator": function(op,that,callback){
+			if(op!=="[]") return callback("src.datatype.array.operator.unrecognized");
+			that.convert("integer",(function(error,result){
+				if(error) callback(error,result);
+				else if(that.value.indexOf("Infinity")!==-1 || this.value==="NaN")
+					callback("src.datatype.array.operator.invalid-index");
+				else callback(null, this.value[that.value] );
+			}).bind(this));
+		}
+	};
+	callback(null,a);
+};
+
+datatype.object = function(lib,src,data,callback){
+	var x = function(init,callback){
+		this.value = {};
+		for(var i=0;i<init.key.length;++i)
+			this.value[init.key[i].value] = init.val[i];
+		callback(null, this);
+	};
+	x.prototype = {
+		"convert": function(type,callback){
+			var self = this;
+			if(type==="undefined") callback(null, src.datatype.undefined.instance);
+			else if(type==="boolean") callback(null, src.datatype.boolean.true );
+			else if(type==="integer") callback(null, src.datatype.integer.nan );
+			else if(type==="object") callback(null, this);
+			else if(type==="string")
+				lib.async.series.call(this,Array.prototype.concat.apply([],
+					Object.keys(this.value).map(function(key){ return [
+						function(cb){ cb(null,key); },
+						function(cb){ self.value[key].convert("string",cb); }
+					]; })
+				),callback,function(pairs){
+					new src.datatype.string("{"+pairs.map(function(key,i){
+						return i%2 ? "" : JSON.stringify(key)+":"+JSON.stringify(pairs[i+1]);
+					}).join(",")+"}", callback);
+				});
+		},
+		"operator": function(op,that,callback){
+			if(op!=="[]") return callback("src.datatype.object.operator.unrecognized");
+			callback(null, this.value[that.value]);
+		}
+	};
+	callback(null,x);
 };
 
 datatype.string = function(lib,src,data,callback){
@@ -163,7 +231,19 @@ datatype.function = function(lib,src,data,callback){
 	});
 };
 
+// Auxiliary Functions
 
+// note: instanceof checks dont work, so prototype comparisons are being used.
+
+datatype.$gettype = function(lib,src,data,callback){
+	var result = function(value,callback){
+		for(var type in src.datatype)
+			if(type[0]!=="$" && value.__proto__===src.datatype[type].prototype)
+				return new src.datatype.string(type,callback);
+		callback("src.datatype.$gettype.unknown");
+	};
+	callback(null,result);
+};
 
 datatype.$operator = function(lib,src,data,callback){
 	// datatypes in increasing order of datatype size
@@ -176,7 +256,6 @@ datatype.$operator = function(lib,src,data,callback){
 	};
 
  	var fn = function(operator,left,right,callback){
- 		// note: __proto__ is being used instead of constructor intentionally
 		if(left.__proto__ === right.__proto__ || operator==="===" || operator==="!=="){
 			if(left.__proto__ !== right.__proto__)
 				callback(null,src.datatype.boolean[operator[0]==="!"?"true":"false"]);

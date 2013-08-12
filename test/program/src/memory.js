@@ -62,6 +62,7 @@ module.exports = function(lib,src,data,callback){
 			},
 			"start" : function(access,labels,argsdata,callback){
 				var obj = {};
+				// obj.local = src.datatype.
 				// TODO: add arguments array
 				for(var i=0; i<labels.length; ++i)
 					obj[labels[i]] = {

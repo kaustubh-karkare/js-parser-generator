@@ -1,3 +1,17 @@
+
+square = [0,1,4,9,16,25,36,49,64,81,100],
+x = {
+	"int":1,
+	"str":"two",
+	"arr":[3,4],
+	"obj":{"a":"b","c":"d"},
+	"fn":function(x){ return x*x; }
+},
+"init";
+
+square[2+3];
+x.fn(13);
+
 1 + 25 * 20 + 4 / 2 - 13%10 ; // arithmetic operations
 !true - (-1) + "2"; // implicit type casting
 1<2 ? -1>-2 ? 42 : -666 : -666 ; // ternary operator

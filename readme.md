@@ -5,6 +5,8 @@
     node test/async # asynchronous evaluation of patterns
     node test/program # a simple programming language
 
+Execution Results: [basic](https://gist.github.com/kaustubh-karkare/6209821), [async](https://gist.github.com/kaustubh-karkare/6209815) & [program](https://gist.github.com/kaustubh-karkare/6209800).
+
 ## Usage
 
 ```javascript

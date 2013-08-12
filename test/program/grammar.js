@@ -92,27 +92,14 @@ declaration
 			});
 		}
 
+// RHS Expression
+
 expression = exp:exp_assign ("," _ exp:exp_assign)*
 	{ lib.async.series(a(exp),callback,function(r){ callback(null,r.pop()); }); }
 
 exp_assign
 	= (left:identifier operator:op_assign _)* right:exp_ternary
-		{
-			left = a(left); operator = a(operator);
-			lib.async.series(left.concat(right),callback,function(names){
-				var value = names.pop();
-				lib.async.series(names.reverse().map(function(name,i){
-					if(operator[i]==="=") return function(cb){ src.memory.set(name,value,cb); };
-					else return function(cb){
-						lib.async.waterfall([
-							function(cb2){ src.memory.get(name,cb2); },
-							function(current,cb2){ src.datatype.$operator(operator[i].slice(0,-1),current,value,cb2); },
-							function(next,cb2){ src.memory.set(name,value=next,cb2); }
-						],cb);
-					};
-				}),callback,function(){ callback(null,value); });
-			});
-		};
+		{ src.action.assignment(a(left),a(operator),right,callback); };
 op_assign = "=" | "+=" | "-=" | "*=" | "/=" | "%=" ;
 
 exp_ternary
@@ -130,35 +117,52 @@ op_binary
 	| "&&" | "||" // logical
 
 exp_unary
-	= "(" _ val:expression ")" _
-		{ val(callback); }
-	| pre:op_prefix* val:exp_primary post:op_suffix*
-		{ src.action.unary(a(pre),val,a(post),callback); }
+	= operator:op_unary* ( val:exp_primary | "(" _ val:expression ")" _ )
+		{ src.action.unary(a(operator),val,callback); }
+op_unary
+	= data:("typeof" | "void") _1 { callback(null,data); }
+	| data:("+" | "-" | "!") _ { callback(null,data); }
+
+exp_primary
+	= pre:op_prefix* name:( boolean | integer | string | array | object | function | identifier )
+		&{ return keywords.indexOf(name)===-1; } post:op_suffix*
+		{
+			pre = a(pre); post = a(post);
+			lib.async.series(pre.concat(name).concat(post), callback, function(result){
+				src.action.primary( result.slice(0,pre.length), result[pre.length],
+					result.slice(pre.length+1), callback );
+			});
+		}
 op_prefix
-	= data:("delete" | "new" | "typeof" | "void") _1 { callback(null,data); }
-	| data:("++" | "--" | "+" | "-" | "!") _ { callback(null,data); }
+	= key:"new" _1 { callback(null,key); }
+	| key:"delete" _1 { callback(null,key); }
 op_suffix
-	= "++" _ | "--" _
-	| "." _ identifier
-	| "[" _ expression "]" _
+	= ( "." _ key:identifier | "[" _ key:expression "]" _ )
+		{
+			lib.async.waterfall([
+				key,
+				function(result,cb){
+					if(typeof(result)==="string") new src.datatype.string(result,cb);
+					else result.convert("string",cb);
+				},
+				function(result,cb){ result.id = "[]"; cb(null,result); }
+			],callback);
+		}
 	| "(" _ (exp:exp_assign ("," _ exp:exp_assign)* )? ")" _
 		{
-			lib.async.series(a(exp), callback, function(args){
+			lib.async.series(a(exp),callback,function(args){
 				args.id = "()";
 				callback(null,args);
 			});
 		}
-// pre/post increment operators require variables, not values
-// prefix operators have higher precendence
-// the new operator requires the current value to be a function & suffix operator to be a call
 
-exp_primary
-	= boolean
-	| integer
-	| string
-	| name:identifier /* avoid conflicts with keywords, use a predicate here */
-		{ lib.async.waterfall([name,src.memory.get],callback); }
-	| function
+// LHS Expression
+
+reference
+	= identifier
+	| c:expression "?" _ t:reference ":"_ e:reference
+
+// Datatypes
 
 identifier = char:[$_A-Z]i (char:[$_A-Z0-9]i)* _ str:&{
 		var str = a(char).join("");
@@ -166,8 +170,6 @@ identifier = char:[$_A-Z]i (char:[$_A-Z0-9]i)* _ str:&{
 		this.result = str;
 		return true;
 	} { callback(null,str); };
-
-// Datatypes
 
 undefined = "undefined" _ { callback(null,src.datatype.undefined.instance); }
 
@@ -186,8 +188,24 @@ integer
 		{ callback(null,src.datatype.integer["Infinity"]); }
 
 array
-	= "[" _ (item:expression ("," _ item:expression)*)? "]" _
-		{ callback("grammar.array"); }
+	= "[" _ (item:exp_assign ("," _ item:exp_assign)*)? "]" _
+		{
+			lib.async.series(a(item),callback,function(list){
+				new src.datatype.array(list,callback);
+			});
+		}
+
+object
+	= "{" _ (key:string ":" _ val:exp_assign ("," _ key:string ":" _ val:exp_assign)*)? "}" _
+		{
+			key = a(key); val = a(val);
+			lib.async.series(key.concat(val),callback,function(result){
+				new src.datatype.object({
+					"key": result.slice(0,key.length),
+					"val": result.slice(key.length)
+				},callback);
+			});
+		}
 
 function
 	= "function" start:&{ this.result=this.index-8; return true; } _ "(" _
