@@ -7,10 +7,10 @@ var last = function(a){
 };
 
 module.exports = function(lib,src,data,callback){
-	data.scope = [{}];
+	data.scope = [];
 	data.scope.last = last(data.scope);
 
-	data.access = [[0]];
+	data.access = [];
 	data.access.last = last(data.access);
 
 	var find = function(type,name,value,callback){
@@ -61,19 +61,23 @@ module.exports = function(lib,src,data,callback){
 				callback(null,data.access.last());
 			},
 			"start" : function(access,labels,argsdata,callback){
-				var obj = {};
-				// obj.local = src.datatype.
-				// TODO: add arguments array
-				for(var i=0; i<labels.length; ++i)
-					obj[labels[i]] = {
-						"type": "variable",
-						"value": argsdata[i] || src.datatype.undefined.instance
-					};
-				data.access.push([data.scope.push(obj)-1].concat(access));
-				callback(null);
+				lib.async.series([
+					function(cb){ new src.datatype.object({"key":[]},cb); },
+					function(cb){ new src.datatype.array(argsdata,cb); },
+				], callback, function(result){
+					var obj = result[0].value;
+					// obj.local = {"type":"object","value":result[0]};
+					obj.arguments = {"type":"array","value":result[1]};
+					for(var i=0; i<labels.length; ++i)
+						obj[labels[i]] = {
+							"type": "variable",
+							"value": argsdata[i] || src.datatype.undefined.instance
+						};
+					data.access.push([data.scope.push(obj)-1].concat(access));
+					callback(null);
+				});
 			},
 			"end" : function(callback){
-				if(data.access.length<=1) return callback("return.toplevel");
 				data.access.pop();
 				// TODO: garbage collection
 				callback(null);

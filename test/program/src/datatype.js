@@ -96,7 +96,7 @@ datatype.integer = function(lib,src,data,callback){
 
 datatype.array = function(lib,src,data,callback){
 	var a = function(init,callback){
-		this.value = init;
+		this.value = init.slice(0);
 		callback(null, this);
 	};
 	a.prototype = {
@@ -217,10 +217,9 @@ datatype.function = function(lib,src,data,callback){
 				src.memory.function.start.bind(null,this.access,this.args,that),
 				this.body
 			],function(error,result){
-				if(error) callback(error,result);
-				else src.memory.function.end(function(error2){
-					if(error2) callback(error2, result);
-					else callback(null, result[1]);
+				src.memory.function.end(function(error2){
+					if(error||error2) callback(error||error2,result);
+					else callback(null, result[1] || src.datatype.undefined.instance);
 				});
 			});
 		}

@@ -33,3 +33,4 @@ closure = function(){
 }();
 closure();
 closure();
+// */

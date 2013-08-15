@@ -30,7 +30,17 @@ program
 			init(function(e){
 				if(e) return callback(e);
 				// init was not chained in the following call as it modifies src
-				lib.async.waterfall([s,src.action.string], callback);
+				lib.async.series([
+					src.memory.function.start.bind(null,[],[],[]),
+					function(cb){
+						s(function(e,r){
+							if(e==="function.return") src.action.string(r[r.length-1],cb);
+							else if(e) cb(e,r);
+							else src.action.string(r,cb);
+						});
+					},
+					src.memory.function.end.bind(null)
+				], callback, function(r){ callback(null,r[1]); });
 			});
 		}
 
@@ -92,15 +102,19 @@ declaration
 			});
 		}
 
-// RHS Expression
+// Expression
 
 expression = exp:exp_assign ("," _ exp:exp_assign)*
 	{ lib.async.series(a(exp),callback,function(r){ callback(null,r.pop()); }); }
 
 exp_assign
-	= (left:identifier operator:op_assign _)* right:exp_ternary
+	= (left:exp_left operator:op_assign _)* right:exp_ternary
 		{ src.action.assignment(a(left),a(operator),right,callback); };
 op_assign = "=" | "+=" | "-=" | "*=" | "/=" | "%=" ;
+
+exp_left
+	= key:identifier ((key:op_suffix)* key:op_suffix_property)?
+		{ lib.async.series(a(key),callback); }
 
 exp_ternary
 	= c:exp_binary (i:"?" _ t:expression ":" _ e:expression)?
@@ -137,6 +151,10 @@ op_prefix
 	= key:"new" _1 { callback(null,key); }
 	| key:"delete" _1 { callback(null,key); }
 op_suffix
+	= op_suffix_property
+	| op_suffix_function
+
+op_suffix_property
 	= ( "." _ key:identifier | "[" _ key:expression "]" _ )
 		{
 			lib.async.waterfall([
@@ -148,19 +166,14 @@ op_suffix
 				function(result,cb){ result.id = "[]"; cb(null,result); }
 			],callback);
 		}
-	| "(" _ (exp:exp_assign ("," _ exp:exp_assign)* )? ")" _
+op_suffix_function
+	= "(" _ (exp:exp_assign ("," _ exp:exp_assign)* )? ")" _
 		{
 			lib.async.series(a(exp),callback,function(args){
 				args.id = "()";
 				callback(null,args);
 			});
 		}
-
-// LHS Expression
-
-reference
-	= identifier
-	| c:expression "?" _ t:reference ":"_ e:reference
 
 // Datatypes
 
