@@ -105,19 +105,31 @@ datatype.array = function(lib,src,data,callback){
 			else if(type==="boolean") callback(null, src.datatype.boolean.true );
 			else if(type==="integer") callback(null, src.datatype.integer.nan );
 			else if(type==="array") callback(null, this);
-			else if(type==="string") lib.async.series(this.value.map(function(item){
-				return function(cb){ item.convert("string",cb); }
-			}),callback,function(list){
-				new src.datatype.string("["+list.map(function(i){ return JSON.stringify(i.value); }).join(",")+"]", callback);
-			});
+			else if(type==="string") new src.datatype.string("[array]",callback);
 		},
 		"operator": function(op,that,callback){
 			if(op!=="[]") return callback("src.datatype.array.operator.unrecognized");
-			that.convert("integer",(function(error,result){
+			if(that.value==="length") new src.datatype.integer(this.value.length,callback);
+			else that.convert("integer",(function(error,result){
 				if(error) callback(error,result);
 				else if(that.value.indexOf("Infinity")!==-1 || this.value==="NaN")
 					callback("src.datatype.array.operator.invalid-index");
-				else callback(null, this.value[that.value] );
+				else callback(null, this.value[that.value] || src.datatype.undefined.instance );
+			}).bind(this));
+		},
+		"assign": function(key,val,callback){
+			var i = (key.value==="length" ? val : key);
+			i.convert("integer",(function(error,result){
+				if(error) return callback(error,result);
+				i = result.value.num();
+				if(i===Infinity || i===-Infinity || i!==i || i<0)
+					callback("src.datatype.array.assign.invalid-index");
+				else if(key.value==="length"){
+					if(i<=this.value.length) this.value.length = i;
+					else while(this.value.length<i)
+						this.value.push(src.datatype.undefined.instance);
+					callback(null, result);
+				} else callback(null, this.value[i] = val );
 			}).bind(this));
 		}
 	};
@@ -132,27 +144,21 @@ datatype.object = function(lib,src,data,callback){
 		callback(null, this);
 	};
 	x.prototype = {
-		"convert": function(type,callback){
+		"convert": function(type,callback,start){
 			var self = this;
 			if(type==="undefined") callback(null, src.datatype.undefined.instance);
 			else if(type==="boolean") callback(null, src.datatype.boolean.true );
 			else if(type==="integer") callback(null, src.datatype.integer.nan );
 			else if(type==="object") callback(null, this);
-			else if(type==="string")
-				lib.async.series.call(this,Array.prototype.concat.apply([],
-					Object.keys(this.value).map(function(key){ return [
-						function(cb){ cb(null,key); },
-						function(cb){ self.value[key].convert("string",cb); }
-					]; })
-				),callback,function(pairs){
-					new src.datatype.string("{"+pairs.map(function(key,i){
-						return i%2 ? "" : JSON.stringify(key)+":"+JSON.stringify(pairs[i+1]);
-					}).join(",")+"}", callback);
-				});
+			else if(type==="string") new src.datatype.string("[object]",callback);
 		},
 		"operator": function(op,that,callback){
 			if(op!=="[]") return callback("src.datatype.object.operator.unrecognized");
-			callback(null, this.value[that.value]);
+			callback(null, this.value[that.value] || src.datatype.undefined.instance);
+		},
+		"assign": function(key,val,callback){
+			this.value[key.value] = val;
+			callback(null,val);
 		}
 	};
 	callback(null,x);
@@ -258,7 +264,7 @@ datatype.$operator = function(lib,src,data,callback){
 		if(left.__proto__ === right.__proto__ || operator==="===" || operator==="!=="){
 			if(left.__proto__ !== right.__proto__)
 				callback(null,src.datatype.boolean[operator[0]==="!"?"true":"false"]);
-			else left.operator(operator.substr(-2),right,callback);
+			else left.operator(operator.slice(0,2),right,callback);
 		} else {
 			var type = ordering[Math.max(rank(left),rank(right))];
 			lib.async.series([

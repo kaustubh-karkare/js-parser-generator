@@ -5,16 +5,35 @@ module.exports = function(lib,src,data,callback){
 
 	result.assignment = function(left,operator,right,callback){
 		lib.async.series(left.concat(right),callback,function(names){
-			var value = names.pop();
+			var value = names.pop(), result;
 			lib.async.series(names.reverse().map(function(name,i){
-				if(operator[i]==="=") return function(cb){ src.memory.set(name,value,cb); };
-				else return function(cb){
-					lib.async.waterfall([
-						function(cb2){ src.memory.get(name,cb2); },
-						function(current,cb2){ src.datatype.$operator(operator[i].slice(0,-1),current,value,cb2); },
-						function(next,cb2){ src.memory.set(name,value=next,cb2); }
-					],cb);
-				};
+				if(name.length>1){
+					return function(cb){
+						lib.async.waterfall([
+							function(cb2){ src.action.primary([],name[0],name.slice(1,-1),cb2); },
+							function(r,cb2){
+								result = r;
+								if(operator[i]==="=") cb2(null,null);
+								else result.operator("[]",name[name.length-1],cb2);
+							},
+							function(current,cb2){
+								if(operator[i]==="=") cb2(null,value);
+								else src.datatype.$operator(operator[i].slice(0,-1),current,value,cb2);
+							},
+							function(val,cb2){ result.assign(name[name.length-1],value = val,cb2); }
+						],cb);
+					};
+				} else if(operator[i]==="="){
+					return function(cb){ src.memory.set(name[0],value,cb); };
+				} else {
+					return function(cb){
+						lib.async.waterfall([
+							function(cb2){ src.memory.get(name[0],cb2); },
+							function(current,cb2){ src.datatype.$operator(operator[i].slice(0,-1),current,value,cb2); },
+							function(next,cb2){ src.memory.set(name[0],value=next,cb2); }
+						],cb);
+					};
+				}
 			}),callback,function(){ callback(null,value); });
 		});
 	};
@@ -26,6 +45,7 @@ module.exports = function(lib,src,data,callback){
 				if(e) callback(e);
 				else if(r.value) then(callback);
 				else if(alt) alt(callback);
+				else callback(null,src.datatype.undefined.instance);
 			});
 		});
 	};
@@ -39,7 +59,7 @@ module.exports = function(lib,src,data,callback){
 				function(result,cb){ result.value ? then(cb) : cb("~"); },
 				function(result,cb){ list.push(result); next ? next(cb) : cb(null); }
 			],function(error){
-				if(error==="~") callback(null,list);
+				if(error==="~") callback(null,src.datatype.undefined.instance);
 				else if(error) callback(error);
 				else condition(fn);
 			});
@@ -110,8 +130,7 @@ module.exports = function(lib,src,data,callback){
 					case "()":
 						if(typeof(result)==="string") return src.memory.get(result,fn);
 						else return result.operator(next.id, post.shift(), function(error,result){
-							if(error==="function.return")
-								fn(null,result[result.length-1]);
+							if(error==="function.return") fn(null,result);
 							else fn(error,result);
 						});
 				}

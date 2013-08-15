@@ -19,14 +19,11 @@ module.exports = function(lib,src,data,callback){
 			if(name in data.scope[a[i]])
 				switch(type){
 					case "get":
-						return callback(null, data.scope[a[i]][name].value);
+						return callback(null, data.scope[a[i]][name]);
 					case "set":
-						var obj = data.scope[a[i]][name];
-						if(obj.type==="variable" || value.__proto__ === src.datatype[obj.type].prototype)
-							return callback(null, obj.value = value);
-						else callback("src.memory.set.incorrect-type");
+						return callback(null, data.scope[a[i]][name] = value);
 					case "del":
-						var temp = data.scope[a[i]][name].value;
+						var temp = data.scope[a[i]][name];
 						delete data.scope[a[i]][name];
 						return callback(null,temp);
 				}
@@ -36,7 +33,7 @@ module.exports = function(lib,src,data,callback){
 				if(lenient) return callback(null,src.datatype.undefined.instance);
 				else return callback("src.memory.get.undefined");
 			case "set":
-				if(lenient) return callback(null,data.scope[a[0]][name]={"type":"variable","value":value});
+				if(lenient) return callback(null,data.scope[a[0]][name]=value);
 				else return callback("src.memory.set.undefined");
 			case "del":
 				if(lenient) return callback(null,src.datatype.undefined.instance);
@@ -45,11 +42,10 @@ module.exports = function(lib,src,data,callback){
 	};
 
 	var result = {
-		"new" : function(type,name,value,callback){
+		"new" : function(name,value,callback){
 			// note: overwrite of existing value possible
-			if(src.datatype[type].prototype!==value.__proto__)
-				return callback("src.memory.new.incorrect-type");
-			data.scope[ data.access.last()[0] ][name] = {"type":type,"value":value};
+			var i = data.access.last()[0];
+			data.scope[i][name] = value;
 			callback(null,value);
 		},
 		"get" : function(name,callback){ find("get",name,null,callback); },
@@ -66,13 +62,10 @@ module.exports = function(lib,src,data,callback){
 					function(cb){ new src.datatype.array(argsdata,cb); },
 				], callback, function(result){
 					var obj = result[0].value;
-					// obj.local = {"type":"object","value":result[0]};
-					obj.arguments = {"type":"array","value":result[1]};
+					obj.local = result[0];
+					obj.arguments = result[1];
 					for(var i=0; i<labels.length; ++i)
-						obj[labels[i]] = {
-							"type": "variable",
-							"value": argsdata[i] || src.datatype.undefined.instance
-						};
+						obj[labels[i]] = argsdata[i] || src.datatype.undefined.instance;
 					data.access.push([data.scope.push(obj)-1].concat(access));
 					callback(null);
 				});

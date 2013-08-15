@@ -34,7 +34,7 @@ program
 					src.memory.function.start.bind(null,[],[],[]),
 					function(cb){
 						s(function(e,r){
-							if(e==="function.return") src.action.string(r[r.length-1],cb);
+							if(e==="function.return") src.action.string(r,cb);
 							else if(e) cb(e,r);
 							else src.action.string(r,cb);
 						});
@@ -49,21 +49,11 @@ _1 = &{ return src.predicate.whitespace(this,1); }
 
 statements
 	= s:statement*
-		{
-			var list = [];
-			lib.async.series(a(s).map(function(s){
-				return function(cb){
-					s(function(e,r){
-						if(e==="function.return" || !e)
-							list.push(r);
-						cb(e);
-					});
-				};
-			}),function(e){ callback(e,list); });
-		}
+		{ lib.async.series(a(s),callback); }
 
 statement
 	= "{" _ s:statements  "}" _ { s(callback); }
+	| ";" _ { callback(null,src.datatype.undefined.instance); }
 	| dec:declaration ";" _ { dec(callback); }
 	| exp:expression ";" _ { exp(callback); }
 	| "if" _ "(" _ c:expression ")" _ t:statement ("else" _ e:statement)?
@@ -91,14 +81,14 @@ statement
 		{ exp(function(error,result){ callback(error || "function.return", result) }); }
 
 declaration
-	= type:&{ return src.predicate.declaration(this); } left:identifier "=" _ right:exp_assign
+	= "var" _1 left:identifier "=" _ right:exp_assign
 		("," _ left:identifier "=" _ right:exp_assign)*
 		{
 			left = a(left); right = a(right);
 			lib.async.series(left.concat(right),callback,function(result){
 				lib.async.series(result.slice(0,left.length).map(function(name,i){
-					return function(cb){ src.memory.new(type,name,result[i+left.length],cb); };
-				}),callback);
+					return function(cb){ src.memory.new(name,result[i+left.length],cb); };
+				}),callback,function(){ callback(null,src.datatype.undefined.instance); });
 			});
 		}
 
@@ -134,7 +124,7 @@ exp_unary
 	= operator:op_unary* ( val:exp_primary | "(" _ val:expression ")" _ )
 		{ src.action.unary(a(operator),val,callback); }
 op_unary
-	= data:("typeof" | "void") _1 { callback(null,data); }
+	= data:("typeof" | "void") _ { callback(null,data); }
 	| data:("+" | "-" | "!") _ { callback(null,data); }
 
 exp_primary
@@ -208,8 +198,19 @@ array
 			});
 		}
 
+object_key
+	= string
+	| name:identifier
+		{
+			name(function(e,r){
+				if(e) callback(e,r);
+				else new src.datatype.string(r,callback);
+			});
+		}
+
 object
-	= "{" _ (key:string ":" _ val:exp_assign ("," _ key:string ":" _ val:exp_assign)*)? "}" _
+	= "{" _ (key:object_key ":" _ val:exp_assign
+		("," _ key:object_key ":" _ val:exp_assign)*)? "}" _
 		{
 			key = a(key); val = a(val);
 			lib.async.series(key.concat(val),callback,function(result){

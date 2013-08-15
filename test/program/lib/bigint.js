@@ -235,9 +235,9 @@ bigint.prototype = {
 	},
 	// Comparison Operators
 	"equalTo": function(that){ var diff = this.subtract(that); return diff.s && diff.d && !diff.d.length; },
-	"lessThan": function(that){ var diff = this.subtract(that); return diff.s<0 && (!diff.d || diff.d.length); },
-	"greaterThan": function(that){ var diff = this.subtract(that); return diff.s>0 && (!diff.d || diff.d.length); },
-	"notEqualTo": function(that){ var diff = this.subtract(that); return !diff.s || !diff.d || diff.d.length; },
+	"lessThan": function(that){ var diff = this.subtract(that); return diff.s<0 && (!diff.d || !!diff.d.length); },
+	"greaterThan": function(that){ var diff = this.subtract(that); return diff.s>0 && (!diff.d || !!diff.d.length); },
+	"notEqualTo": function(that){ var diff = this.subtract(that); return !diff.s || !diff.d || !!diff.d.length; },
 	"lessThanOrEqualTo": function(that){ var diff = this.subtract(that); return diff.s<0 || diff.d && !diff.d.length; },
 	"greaterThanOrEqualTo": function(that){ var diff = this.subtract(that); return diff.s>0 || diff.d && !diff.d.length; },
 };

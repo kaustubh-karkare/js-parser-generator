@@ -6,18 +6,6 @@ module.exports = function(lib,src,data){
 
 	var result = {};
 
-	result.declaration = function(that){
-		var name, type = "variable";
-		if(that.data.substr(that.index,type.length)===type) name = type;
-		else for(type in src.datatype)
-			if(that.data.substr(that.index,type.length)===type && type[0]!=="$")
-				{ name = type; break; }
-		if(!name) return false;
-		that.index += name.length;
-		that.result = name;
-		return this.whitespace(that,1);
-	};
-
 	result.expression = (function(){
 
 		// operators in increasing order of precedence
