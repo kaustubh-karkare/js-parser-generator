@@ -94,37 +94,38 @@ module.exports = function(lib,src,data,callback){
 	};
 
 	result.unary = function(operator,val,callback){
-		lib.async.series(operator, callback, function(operator){
-			var fn = function(error,result){
-				if(error) callback(error);
-				else if(operator.length){
-					switch(operator.pop()){
-						case "!":
-							return lib.async.waterfall([
-								function(cb){ result.convert("boolean", cb); },
-								function(r,cb){ r.operator("!", null, cb); }
-							],fn);
-						case "+":
-							return result.convert("integer", fn);
-						case "-":
-							return lib.async.waterfall([
-								function(cb){ result.convert("integer", cb); },
-								function(r,cb){ r.operator("-", null, cb); }
-							],fn);
-						case "typeof":
-							return new src.datatype.$gettype(result,callback);
-						case "void":
-							return callback(null,src.datatype.undefined.instance);
-					}
-				} else callback(null,result);
-			};
-			val(fn);
-		});
+		var fn = function(error,result){
+			if(error) callback(error);
+			else if(operator.length){
+				switch(operator.pop()){
+					case "!":
+						return lib.async.waterfall([
+							function(cb){ result.convert("boolean", cb); },
+							function(r,cb){ r.operator("!", null, cb); }
+						],fn);
+					case "+":
+						return result.convert("integer", fn);
+					case "-":
+						return lib.async.waterfall([
+							function(cb){ result.convert("integer", cb); },
+							function(r,cb){ r.operator("-", null, cb); }
+						],fn);
+					case "typeof":
+						return new src.datatype.$gettype(result,callback);
+					case "void":
+						return callback(null,src.datatype.undefined.instance);
+				}
+			} else {
+				callback(null,result);
+			}
+		};
+		val(fn);
 	};
 
 	result.primary = function(pre,name,post,callback){
 		// var key = [name];
-		var ac = arguments.callee, fn = function(error,result){
+		var ac = arguments.callee, prev = null;
+		var fn = function(error,result){
 			if(error){
 				callback(error);
 			} else if(pre.length){
@@ -136,9 +137,9 @@ module.exports = function(lib,src,data,callback){
 						return lib.async.waterfall([
 							function(cb){ ac(pre,result,post,cb); },
 							function(r,cb){ result = r; new src.datatype.object({},cb); },
-							function(r,cb){ context = r; result.operator("()",[r,last],cb); }
+							function(r,cb){ context = r; result.operator("()",[1,r,last],cb); }
 						],function(e,r){
-							if(e==="function.return") callback(null,context);
+							if(!e || e==="function.return") callback(null,context);
 							else callback(e,r);
 						});
 					case "delete":
@@ -158,12 +159,13 @@ module.exports = function(lib,src,data,callback){
 				switch(next.id){
 					case "[]":
 						if(typeof(result)==="string") return src.memory.get(result,fn);
-						else return result.operator(next.id, post.shift(), fn);
+						prev = result;
+						return result.operator(next.id, post.shift(), fn);
 					case "()":
 						if(typeof(result)==="string") return src.memory.get(result,fn);
-						else return result.operator(next.id, [null,post.shift()], function(error,result){
+						else return result.operator(next.id, [0,prev,post.shift()], function(error,result){
 							if(error==="function.return") fn(null,result);
-							else fn(error,result);
+							else fn(error,src.datatype.undefined.instance);
 						});
 				}
 			} else {

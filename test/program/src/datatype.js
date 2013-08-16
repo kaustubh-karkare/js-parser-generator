@@ -169,7 +169,10 @@ datatype.object = function(lib,src,data,callback){
 		},
 		"operator": function(op,that,callback){
 			if(op!=="[]") return callback("src.datatype.object.operator.unrecognized");
-			callback(null, this.value[that.value] || src.datatype.undefined.instance);
+			if(!this.value[that.value] && this.value.prototype
+				&& this.value.prototype.__proto__===x.prototype )
+				this.value.prototype.operator(op,that,callback);
+			else callback(null, this.value[that.value] || src.datatype.undefined.instance);
 		},
 		"assign": function(key,val,callback){
 			this.value[key.value] = val;
@@ -238,17 +241,36 @@ datatype.function = function(lib,src,data,callback){
 			else if(type==="function") callback(null, this);
 		},
 		"operator": function(op,that,callback){
+			if(op==="[]" && that.value==="prototype") return callback(null, this.proto || src.datatype.undefined.instance);
 			if(op!=="()") return callback("src.datatype.function.operator.unrecognized");
-			lib.async.series([
-				src.memory.function.start.bind(null,this,this.access,this.args,that[1]),
-				src.memory.set.bind(null,"this",that[0] || src.datatype.undefined.instance),
-				this.body
+			lib.async.series.call(this,[
+				src.memory.function.start.bind(null,this,this.access,this.args,that[2]),
+				function(cb){
+					if(!that[0] || !that[1]) cb(null);
+					else that[1].assign({value:"prototype"},this.proto || src.datatype.undefined.instance,cb);
+				},
+				src.memory.set.bind(null,"this",that[1] || src.datatype.undefined.instance),
+				this.body,
 			],function(error,result){
 				src.memory.function.end(function(error2){
-					if(error||error2) callback(error||error2,result);
-					else callback(null, result[1] || src.datatype.undefined.instance);
+					if(error||error2) callback(error||error2, result);
+					else callback(null, result.pop() || src.datatype.undefined.instance);
 				});
 			});
+		},
+		"assign": function(key,val,callback){
+			if(key.value!=="prototype")
+				return callback("src.datatype.function.assignment.not-allowed");
+			if(val.__proto__!==src.datatype.object.prototype)
+				return callback("src.datatype.function.assignment.prototype-must-be-an-object");
+			callback(null, this.proto = val);
+		},
+		"delete": function(key,callback){
+			if(key!=="prototype")
+				return callback("src.datatype.function.deletion.not-allowed");
+			var temp = this.proto;
+			this.proto = src.datatype.undefined.instance;
+			callback(null, temp);
 		}
 	};
 	new f({"args":[],"body":function(){},"str":"[function:no-operation]"},function(e,r){

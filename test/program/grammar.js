@@ -21,7 +21,7 @@
 		"if","while","do","for","function","new","delete","typeof","void",
 		"undefined","boolean","true","false","integer","NaN","Infinity","string"];
 
-	var echo = function(cb){ return function(){ console.log("#",arguments); cb.apply(null,arguments); }; };
+	var echo = function(cb){ return function(){ console.log("#",JSON.stringify(arguments,null,4)); cb.apply(null,arguments); }; };
 }
 
 program
@@ -54,6 +54,7 @@ statements
 statement
 	= "{" _ s:statements  "}" _ { s(callback); }
 	| ";" _ { callback(null,src.datatype.undefined.instance); }
+	| "echo" _ exp:expression ";" _ { exp(echo(callback)); }
 	| dec:declaration ";" _ { dec(callback); }
 	| exp:expression ";" _ { exp(callback); }
 	| "if" _ "(" _ c:expression ")" _ t:statement ("else" _ e:statement)?
@@ -122,7 +123,11 @@ op_binary
 
 exp_unary
 	= operator:op_unary* ( val:exp_primary | "(" _ val:expression ")" _ )
-		{ src.action.unary(a(operator),val,callback); }
+		{
+			lib.async.series(a(operator),callback,function(operator){
+				src.action.unary(operator,val,callback);
+			});
+		}
 op_unary
 	= data:("typeof" | "void") _ { callback(null,data); }
 	| data:("+" | "-" | "!") _ { callback(null,data); }

@@ -16,17 +16,18 @@ var Timer = function(){
 	return function(){ return (new Date().getTime()-start)+" ms"; };
 };
 
-var requiredir = function(relpath){
+var requiredir = function(relpath,literal){
 	var dirpath = path.join(__dirname+path.sep,relpath);
 	if(!fs.existsSync(dirpath) || !fs.statSync(dirpath).isDirectory()) return null;
 	var list = fs.readdirSync(path.join(dirpath));
 	var result = {};
 	for(var i=0,name; name=list[i]; ++i){
 		var filepath = path.join(dirpath+path.sep,name), stat = fs.statSync(filepath);
-		if(stat.isFile() && name.slice(-3)===".js")
-			result[name.slice(0,-3)] = require(filepath);
+		if(stat.isFile())
+			if(!literal && name.slice(-3)===".js") result[name.slice(0,-3)] = require(filepath);
+			else result[name] = fs.readFileSync(filepath).toString();
 		else if(stat.isDirectory())
-			result[name] = arguments.callee(path.join(relpath+path.sep,name));
+			result[name] = arguments.callee(path.join(relpath+path.sep,name),literal);
 	}
 	return result;
 };
@@ -40,16 +41,26 @@ timer = Timer();
 var parser = pg.buildParser(grammar,{ debug:0, lazyeval:1, async:1 });
 print("Generated Parser ("+timer()+")",parser,0);
 
-var program = filedata("code.js");
-print("Input Program",program,1);
+var async = require("./lib/async"),
+	tests = requiredir("test",true);
+async.series(Object.keys(tests).map(function(name,i){
+	return function(callback){
+		// if(i!==2) return callback(null);
 
-timer = Timer();
-var args = [requiredir("lib"),requiredir("src"),{}];
-var syntaxtree = parser.parse(program,args);
-print("Syntax Tree ("+timer()+")",syntaxtree.ast,0);
+		var program = tests[name];
+		print("Input Program : "+name,program,1);
+		var args = [requiredir("lib"),requiredir("src"),{}];
 
-timer = Timer();
-syntaxtree(function(error,result){
-	print("Execution Result ("+timer()+")",error || result,2);
-	// print("Program Data",args[2],2);
-});
+		timer = Timer();
+		var syntaxtree = parser.parse(program,args);
+		print("Syntax Tree ("+timer()+")",syntaxtree.ast,0);
+
+		timer = Timer();
+		syntaxtree(function(error,result){
+			print("Execution Result ("+timer()+")",error || result,2);
+			// print("Program Data",args[2],2);
+			callback(null);
+		});
+
+	};
+}));
