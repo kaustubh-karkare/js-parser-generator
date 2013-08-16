@@ -20,9 +20,14 @@ module.exports = function(lib,src,data,callback){
 								if(operator[i]==="=") cb2(null,value);
 								else src.datatype.$operator(operator[i].slice(0,-1),current,value,cb2);
 							},
-							function(val,cb2){ result.assign(name[name.length-1],value = val,cb2); }
+							function(val,cb2){
+								if(!result.assign) cb2("assignment.invalid-reference");
+								else result.assign(name[name.length-1],value = val,cb2);
+							}
 						],cb);
 					};
+				} else if(name[0]==="this"){
+					return callback("assignment.cannot-modify-this");
 				} else if(operator[i]==="="){
 					return function(cb){ src.memory.set(name[0],value,cb); };
 				} else {
@@ -119,9 +124,36 @@ module.exports = function(lib,src,data,callback){
 
 	result.primary = function(pre,name,post,callback){
 		// var key = [name];
-		var fn = function(error,result){
-			if(error) callback(error);
-			else if(post.length){
+		var ac = arguments.callee, fn = function(error,result){
+			if(error){
+				callback(error);
+			} else if(pre.length){
+				// prefix operators are applied first
+				switch(pre.pop()){
+					case "new":
+						var last = (post && post[post.length-1].id==="()" ? post.pop() : []);
+						var context;
+						return lib.async.waterfall([
+							function(cb){ ac(pre,result,post,cb); },
+							function(r,cb){ result = r; new src.datatype.object({},cb); },
+							function(r,cb){ context = r; result.operator("()",[r,last],cb); }
+						],function(e,r){
+							if(e==="function.return") callback(null,context);
+							else callback(e,r);
+						});
+					case "delete":
+						var last = post.pop();
+						if(typeof(result)!=="string" || last && last.id==="()")
+							callback("delete.cannot-delete-value");
+						else if(!last) src.memory.del(result,fn);
+						else ac(pre,result,post,function(e,r){
+							if(e) callback(e,r);
+							else if(!r.delete) callback("deletion.invalid-reference");
+							else r.delete(last,fn);
+						});
+						return;
+				}
+			} else if(post.length){
 				var next = post[0];
 				switch(next.id){
 					case "[]":
@@ -129,7 +161,7 @@ module.exports = function(lib,src,data,callback){
 						else return result.operator(next.id, post.shift(), fn);
 					case "()":
 						if(typeof(result)==="string") return src.memory.get(result,fn);
-						else return result.operator(next.id, post.shift(), function(error,result){
+						else return result.operator(next.id, [null,post.shift()], function(error,result){
 							if(error==="function.return") fn(null,result);
 							else fn(error,result);
 						});

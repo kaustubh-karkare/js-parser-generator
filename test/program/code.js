@@ -1,4 +1,19 @@
 
+var being = function(name,age){
+	if(!this) return new arguments.callee(name,age);
+	this.name = name;
+	this.age = age;
+};
+
+var animal = function(species,name,age){
+	this.species = species;
+	this.being = being(name,age);
+};
+
+var me = new animal("species","kaustubh",22);
+me.being.age;
+
+/*
 JSON = {
 	stringify : function(data){
 		if(typeof(data)==="array"){
@@ -19,6 +34,7 @@ square.length;
 JSON.stringify(square);
 square.length = 11;
 JSON.stringify(square);
+delete square;
 
 obj = {
 	"int":1,
@@ -47,4 +63,5 @@ closure = function(){
 closure();
 count = 10;
 closure();
+
 // */

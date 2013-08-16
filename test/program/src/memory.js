@@ -50,22 +50,31 @@ module.exports = function(lib,src,data,callback){
 		},
 		"get" : function(name,callback){ find("get",name,null,callback); },
 		"set" : function(name,value,callback){ find("set",name,value,callback); },
-		"del" : function(name){ find("del",name,null,callback); },
+		"del" : function(name,callback){ find("del",name,null,callback); },
 
 		"function" : {
 			"new" : function(callback){
 				callback(null,data.access.last());
 			},
-			"start" : function(access,labels,argsdata,callback){
+			"start" : function(callee,access,labels,argsdata,callback){
 				lib.async.series([
-					function(cb){ new src.datatype.object({"key":[]},cb); },
-					function(cb){ new src.datatype.array(argsdata,cb); },
+					function(cb){ new src.datatype.object({},cb); },
+					function(cb){
+						new src.datatype.object({
+							key: argsdata.map(function(v,i){ return {"value":i}; }),
+							val: argsdata
+						},cb);
+					},
 				], callback, function(result){
-					var obj = result[0].value;
+					var obj = result[0].value, undef = src.datatype.undefined.instance;;
 					obj.local = result[0];
+					if(data.scope.length){
+						result[1].value.callee = callee || undef;
+						result[1].value.caller = data.scope.last().arguments.value.callee || undef;
+					}
 					obj.arguments = result[1];
 					for(var i=0; i<labels.length; ++i)
-						obj[labels[i]] = argsdata[i] || src.datatype.undefined.instance;
+						obj[labels[i]] = argsdata[i] || undef;
 					data.access.push([data.scope.push(obj)-1].concat(access));
 					callback(null);
 				});

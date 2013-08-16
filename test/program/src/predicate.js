@@ -54,7 +54,7 @@ module.exports = function(lib,src,data){
 				c = that.data[++that.index];
 				if(c in e) that.result += e[c];
 				else if(c==="u" || c==="x"){
-					var len = (c==="x"?4:2), val = that.data.substr(that.index,l);
+					var len = (c==="x"?4:2), val = that.data.substr(that.index,len);
 					if(val.length!==len || val.match(/[^0-9A-F]/i)) return false;
 					that.result += String.fromCharCode( parseInt(val,16) );
 				} else that.result += c;

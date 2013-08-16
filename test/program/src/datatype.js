@@ -4,6 +4,7 @@ var datatype = {};
 datatype.undefined = function(lib,src,data,callback){
 	var u = function(init, callback){
 		if(!(this instanceof u)) return new u(callback);
+		this.type = "undef";
 		callback(null, this);
 	};
 	u.prototype = {
@@ -11,6 +12,7 @@ datatype.undefined = function(lib,src,data,callback){
 			if(type==="undefined") callback(null, this);
 			else if(type==="boolean") callback(null, src.datatype.boolean.false);
 			else if(type==="integer") callback(null, src.datatype.integer[0]);
+			else if(type==="array") callback(null, src.datatype.array.empty);
 			else if(type==="string") callback(null, src.datatype.string.empty);
 		},
 		"operator" : function(op,that,callback){
@@ -131,16 +133,29 @@ datatype.array = function(lib,src,data,callback){
 					callback(null, result);
 				} else callback(null, this.value[i] = val );
 			}).bind(this));
+		},
+		"delete": function(key,callback){
+			key.convert("integer",(function(error,result){
+				if(error) return callback(error,result);
+				var i = result.value.num(),
+					j = this.value[i] || src.datatype.undefined.instance;
+				this.value[i] = src.datatype.undefined.instance;
+				callback(null,j);
+			}).bind(this));
 		}
 	};
-	callback(null,a);
+	new a([],function(e,r){
+		if(!e) a.empty = r;
+		callback(e,a);
+	});
 };
 
 datatype.object = function(lib,src,data,callback){
 	var x = function(init,callback){
 		this.value = {};
-		for(var i=0;i<init.key.length;++i)
-			this.value[init.key[i].value] = init.val[i];
+		if(init.key)
+			for(var i=0;i<init.key.length;++i)
+				this.value[init.key[i].value] = init.val[i];
 		callback(null, this);
 	};
 	x.prototype = {
@@ -159,6 +174,11 @@ datatype.object = function(lib,src,data,callback){
 		"assign": function(key,val,callback){
 			this.value[key.value] = val;
 			callback(null,val);
+		},
+		"delete": function(key,callback){
+			var temp = this.value[key.value];
+			delete this.value[key.value];
+			callback(null,temp);
 		}
 	};
 	callback(null,x);
@@ -220,7 +240,8 @@ datatype.function = function(lib,src,data,callback){
 		"operator": function(op,that,callback){
 			if(op!=="()") return callback("src.datatype.function.operator.unrecognized");
 			lib.async.series([
-				src.memory.function.start.bind(null,this.access,this.args,that),
+				src.memory.function.start.bind(null,this,this.access,this.args,that[1]),
+				src.memory.set.bind(null,"this",that[0] || src.datatype.undefined.instance),
 				this.body
 			],function(error,result){
 				src.memory.function.end(function(error2){

@@ -31,7 +31,7 @@ program
 				if(e) return callback(e);
 				// init was not chained in the following call as it modifies src
 				lib.async.series([
-					src.memory.function.start.bind(null,[],[],[]),
+					src.memory.function.start.bind(null,null,[],[],[]),
 					function(cb){
 						s(function(e,r){
 							if(e==="function.return") src.action.string(r,cb);
@@ -138,8 +138,8 @@ exp_primary
 			});
 		}
 op_prefix
-	= key:"new" _1 { callback(null,key); }
-	| key:"delete" _1 { callback(null,key); }
+	= key:"new" _ { callback(null,key); }
+	| key:"delete" _ { callback(null,key); }
 op_suffix
 	= op_suffix_property
 	| op_suffix_function
@@ -231,4 +231,4 @@ function
 			});
 		}
 
-//
+//*/
