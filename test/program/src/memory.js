@@ -21,13 +21,16 @@ module.exports = function(lib,src,data,callback){
 			lib.async.waterfall(data.access.last().map(function(a,i){
 				return function(result,cb){
 					if(i===0){ cb = result; first = data.scope[a]; }
-					else if(result!==undef) return cb(null,result);
+					else if(result) return cb(null,result);
 					if(getscope) scope = data.scope[a];
-					data.scope[a].operator("[]",name,cb);
+					if(name.value in data.scope[a].value)
+						data.scope[a].operator("[]",name,cb);
+					else cb(null,null);
 				};
 			}),callback,function(result){
 				// in case scope is required for an undefined variable, return the first one
-				callback(null,getscope?(result===undef?first:scope):result);
+				if(getscope) callback(null,!result?first:scope);
+				else callback(null,result||undef);
 			});
 		},
 		"set" : function(name,value,callback){
@@ -52,17 +55,19 @@ module.exports = function(lib,src,data,callback){
 				callback(null,data.access.last());
 			},
 			"start" : function(callee,access,labels,argsdata,callback){
-				var undef = src.datatype.undefined.instance;
+				var undef = src.datatype.undefined.instance, argslen;
 				lib.async.waterfall([
-					function(cb){
+					function(cb){ new src.datatype.integer(argsdata.length,cb); },
+					function(al,cb){
+						argslen = al;
 						if(data.access.length===0) cb(null,null);
 						else cb(null,data.scope[data.access.last()[0]].value.arguments.value.callee);
 					},
 					function(caller,cb){
 						var keys = argsdata.map(function(v,i){ return {"value":i}; }), vals = argsdata;
 						if(data.access.length){
-							keys.push({"value":"callee"},{"value":"caller"});
-							vals.push(callee || undef, caller || undef);
+							keys.push({"value":"length"},{"value":"callee"},{"value":"caller"});
+							vals.push(argslen, callee || undef, caller || undef);
 						}
 						new src.datatype.object({ key: keys, val: vals },cb);
 					},

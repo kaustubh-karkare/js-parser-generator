@@ -1,6 +1,16 @@
 
 var datatype = {};
 
+var upgrade = function(type,op,a,b,callback){
+	a.convert(type,function(e,a){
+		if(e) return callback(e,a);
+		else b.convert(type,function(e,b){
+			if(e) return callback(e,b);
+			else a.operator(op,b,callback);
+		});
+	});
+};
+
 datatype.undefined = function(lib,src,data,callback){
 	var u = function(init, callback){
 		if(!(this instanceof u)) return new u(callback);
@@ -12,11 +22,12 @@ datatype.undefined = function(lib,src,data,callback){
 			if(type==="undefined") callback(null, this);
 			else if(type==="boolean") callback(null, src.datatype.boolean.false);
 			else if(type==="integer") callback(null, src.datatype.integer[0]);
-			else if(type==="array") callback(null, src.datatype.array.empty);
 			else if(type==="string") callback(null, src.datatype.string.empty);
+			else callback("src.datatype.undefined.convert.invalid");
 		},
 		"operator" : function(op,that,callback){
-			callback("src.datatype.undefined.operator.unrecognized");
+			upgrade("boolean",op,this,that,callback);
+			// callback("src.datatype.undefined.operator.unrecognized");
 		}
 	};
 	new u(null,function(e,r){
@@ -36,14 +47,14 @@ datatype.boolean = function(lib,src,data,callback){
 			else if(type==="boolean") callback(null, this);
 			else if(type==="integer") callback(null, this.value ? src.datatype.integer[1] : src.datatype.integer[0] );
 			else if(type==="string") new src.datatype.string(this.value?"true":"false",callback);
+			else callback("src.datatype.boolean.convert.invalid");
 		},
 		"operator" : function(op,that,callback){
 			if(op==="!") callback(null, this.value ? b.false : b.true);
-			else if(op==="&&") callback(null, this.value && that.value ? b.true : b.false);
-			else if(op==="||") callback(null, this.value || that.value ? b.true : b.false);
 			else if(op==="==") callback(null, this.value == that.value ? b.true : b.false);
 			else if(op==="!=") callback(null, this.value != that.value ? b.true : b.false);
-			else callback("src.datatype.boolean.operator.unrecognized");
+			else upgrade("integer",op,this,that,callback);
+			// callback("src.datatype.boolean.operator.unrecognized");
 		}
 	};
 	lib.async.series({
@@ -75,6 +86,7 @@ datatype.integer = function(lib,src,data,callback){
 			else if(type==="boolean") callback(null, src.datatype.boolean[this.value.neq(i[0].value)?"true":"false"] );
 			else if(type==="integer") callback(null, this);
 			else if(type==="string") new src.datatype.string(this.value.str(),callback);
+			else callback("src.datatype.integer.convert.invalid");
 		},
 		"operator" : function(op,that,callback){
 			var temp = (that ? binary[op] : unary[op]);
@@ -106,10 +118,12 @@ datatype.array = function(lib,src,data,callback){
 			if(type==="undefined") callback(null, src.datatype.undefined.instance);
 			else if(type==="boolean") callback(null, src.datatype.boolean.true );
 			else if(type==="integer") callback(null, src.datatype.integer.nan );
-			else if(type==="array") callback(null, this);
 			else if(type==="string") new src.datatype.string("[array]",callback);
+			else if(type==="array") callback(null, this);
+			else callback("src.datatype.array.convert.invalid");
 		},
 		"operator": function(op,that,callback){
+			if(op==="==" || op==="!=") return callback(null,src.datatype.boolean[op==="!="^this===that?"true":"false"]);
 			if(op!=="[]") return callback("src.datatype.array.operator.unrecognized");
 			if(that.value==="length") new src.datatype.integer(this.value.length,callback);
 			else that.convert("integer",(function(error,result){
@@ -143,12 +157,21 @@ datatype.array = function(lib,src,data,callback){
 				this.value[i] = undef;
 				callback(null,src.datatype.boolean[j?"true":"false"]);
 			}).bind(this));
+		},
+		"iterate": function(step,callback){
+			var index = -1, tv = this.value;
+			var fn = function(e,r){
+				if(e) callback(e,r);
+				else if(++index===tv.length) callback(null);
+				else new src.datatype.integer(index,function(e,i){
+					if(e) callback(e,i);
+					else step(i,tv[index],fn);
+				});
+			};
+			fn(null);
 		}
 	};
-	new a([],function(e,r){
-		if(!e) a.empty = r;
-		callback(e,a);
-	});
+	callback(null,a);
 };
 
 datatype.object = function(lib,src,data,callback){
@@ -165,10 +188,12 @@ datatype.object = function(lib,src,data,callback){
 			if(type==="undefined") callback(null, src.datatype.undefined.instance);
 			else if(type==="boolean") callback(null, src.datatype.boolean.true );
 			else if(type==="integer") callback(null, src.datatype.integer.nan );
-			else if(type==="object") callback(null, this);
 			else if(type==="string") new src.datatype.string("[object]",callback);
+			else if(type==="object") callback(null, this);
+			else callback("src.datatype.object.convert.invalid");
 		},
 		"operator": function(op,that,callback){
+			if(op==="==" || op==="!=") return callback(null,src.datatype.boolean[op==="!="^this===that?"true":"false"]);
 			if(op!=="[]") return callback("src.datatype.object.operator.unrecognized");
 			if(!this.value[that.value] && this.value.prototype
 				&& this.value.prototype.__proto__===x.prototype )
@@ -183,6 +208,18 @@ datatype.object = function(lib,src,data,callback){
 			var temp = this.value[key.value];
 			delete this.value[key.value];
 			callback(null,src.datatype.boolean[temp?"true":"false"]);
+		},
+		"iterate": function(step,callback){
+			var keys = Object.keys(this.value), index = -1, tv = this.value;
+			var fn = function(e,r){
+				if(e) return callback(e,r);
+				else if(++index===keys.length) callback(null);
+				else new src.datatype.string(keys[index],function(e,k){
+					if(e) return callback(e,k);
+					else step(k,tv[keys[index]],fn);
+				});
+			}
+			fn(null);
 		}
 	};
 	callback(null,x);
@@ -201,6 +238,7 @@ datatype.string = function(lib,src,data,callback){
 		"<=": function(that){ return this.value<=that.value; },
 		">": function(that){ return this.value>that.value; },
 		">=": function(that){ return this.value>=that.value; },
+		"[]": function(that){ return this.value[that.value.num()]; }
 	};
 	s.prototype = {
 		"convert": function(type,callback){
@@ -208,6 +246,7 @@ datatype.string = function(lib,src,data,callback){
 			else if(type==="boolean") callback(null, src.datatype.boolean[this.value!==""?"true":"false"] );
 			else if(type==="integer") new src.datatype.integer(this.value, callback);
 			else if(type==="string") callback(null, this);
+			else callback("src.datatype.string.convert.invalid");
 		},
 		"operator": function(op,that,callback){
 			var temp = binary[op];
@@ -228,10 +267,14 @@ datatype.function = function(lib,src,data,callback){
 		this.args = init.args;
 		this.body = init.body;
 		this.str = init.str;
-		src.memory.function.new((function(error,result){
-			if(!error) this.access = result;
-			callback(error, this);
-		}).bind(this));
+		lib.async.series.call(this,[
+			function(cb){ src.memory.function.new(cb); },
+			function(cb){ new src.datatype.object({},cb); }
+		],callback,function(result){
+			this.access = result[0];
+			this.proto = result[1];
+			callback(null, this);
+		});
 	};
 	f.prototype = {
 		"convert": function(type,callback){
@@ -240,9 +283,11 @@ datatype.function = function(lib,src,data,callback){
 			else if(type==="integer") callback(null, src.datatype.integer.nan );
 			else if(type==="string") new src.datatype.string( this.str, callback );
 			else if(type==="function") callback(null, this);
+			else callback("src.datatype.function.convert.invalid");
 		},
 		"operator": function(op,that,callback){
 			if(op==="[]" && that.value==="prototype") return callback(null, this.proto || src.datatype.undefined.instance);
+			if(op==="==" || op==="!=") return callback(null,src.datatype.boolean[op==="!="^this===that?"true":"false"]);
 			if(op!=="()") return callback("src.datatype.function.operator.unrecognized");
 			lib.async.series.call(this,[
 				src.memory.function.start.bind(null,this,this.access,this.args,that[2]),
@@ -274,10 +319,7 @@ datatype.function = function(lib,src,data,callback){
 			callback(null, temp);
 		}
 	};
-	new f({"args":[],"body":function(){},"str":"[function:no-operation]"},function(e,r){
-		f.noop = r;
-		callback(null,f);
-	});
+	callback(null,f);
 };
 
 // Auxiliary Functions
@@ -296,11 +338,11 @@ datatype.$gettype = function(lib,src,data,callback){
 
 datatype.$operator = function(lib,src,data,callback){
 	// datatypes in increasing order of datatype size
-	var ordering = ["undefined","boolean","integer","array","object","string","function"];
+	var ordering = ["undefined","boolean","integer","array","object","function","string"];
 	var rank = function(obj){
 		for(var i=0; i<ordering.length; ++i)
 			if(obj instanceof src.datatype[ordering[i]])
-				return i;
+				return i<3?i:6;
 		return -1;
 	};
 

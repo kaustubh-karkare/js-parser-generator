@@ -45,7 +45,7 @@ var async = require("./lib/async"),
 	tests = requiredir("test",true);
 async.series(Object.keys(tests).map(function(name,i){
 	return function(callback){
-		// if(i!==0) return callback(null);
+		// if(i!==3) return callback(null);
 
 		var program = tests[name];
 		print("Input Program : "+name,program,1);

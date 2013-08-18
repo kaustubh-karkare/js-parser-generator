@@ -1,12 +1,14 @@
 
 module.exports = function(lib,src,data,callback){
 
+	var undef = src.datatype.undefined.instance;
+	var fnwrap = function(data){ return function(cb){ cb(null,data); }; };
+
 	var result = {};
 
 	result.assignment = function(left,operator,right,callback){
 		lib.async.series(left.concat(right),callback,function(names){
 			var value = names.pop(), result, last, scope;
-			var fnwrap = function(data){ return function(cb){ cb(null,data); }; };
 			lib.async.series(names.reverse().map(function(name,i){
 				return function(cb){
 					if(name.length===1){
@@ -57,7 +59,7 @@ module.exports = function(lib,src,data,callback){
 				if(e) callback(e);
 				else if(r.value) then(callback);
 				else if(alt) alt(callback);
-				else callback(null,src.datatype.undefined.instance);
+				else callback(null,undef);
 			});
 		});
 	};
@@ -71,13 +73,38 @@ module.exports = function(lib,src,data,callback){
 				function(result,cb){ result.value ? then(cb) : cb("~"); },
 				function(result,cb){ list.push(result); next ? next(cb) : cb(null); }
 			],function(error){
-				if(error==="~") callback(null,src.datatype.undefined.instance);
+				if(error==="~") callback(null,undef);
 				else if(error) callback(error);
 				else condition(fn);
 			});
 		};
 		condition(fn);
 	},
+
+	result.forin = function(d,i,j,k,exp,then,callback){
+		lib.async.series([i,j,k,exp],callback,function(r){
+			lib.async.series(d?[
+				src.memory.set.bind(null,r[0],undef),
+				src.memory.set.bind(null,r[1],undef),
+				src.memory.set.bind(null,r[2],r[3]),
+			].slice(0,k?3:j?2:1):[],callback,function(){
+				exp = r[3];
+				i = fnwrap([r[0]]);
+				j = j && fnwrap([r[1]]);
+				k = k && fnwrap([r[2]]);
+				if(!exp.iterate) callback("grammar.for-in.iterable-type-required");
+				else exp.iterate(function(key,val,cb){
+					lib.async.series([
+						src.action.assignment.bind(null,[i],["="],fnwrap(key)),
+						src.action.assignment.bind(null,[j],["="],fnwrap(val)),
+					].slice(0,j?2:1).concat(then),cb);
+				},function(e,r){
+					if(e,r) callback(e,r);
+					else callback(null,undef);
+				});
+			});
+		});
+	};
 
 	result.string = function(data, callback){
 		var get = function(type, callback){
@@ -120,7 +147,7 @@ module.exports = function(lib,src,data,callback){
 					case "typeof":
 						return new src.datatype.$gettype(result,callback);
 					case "void":
-						return callback(null,src.datatype.undefined.instance);
+						return callback(null,undef);
 				}
 			} else {
 				callback(null,result);
@@ -172,7 +199,7 @@ module.exports = function(lib,src,data,callback){
 						if(typeof(result)==="string") return src.memory.get(result,fn);
 						else return result.operator(next.id, [0,prev,post.shift()], function(error,result){
 							if(error==="function.return") fn(null,result);
-							else fn(error,src.datatype.undefined.instance);
+							else fn(error,undef);
 						});
 				}
 			} else {

@@ -6,7 +6,7 @@
 	order.forEach(function(name){ src[name] = src[name](lib,src,data); });
 
 	var init = function(callback){
-		var order = ["action","memory","datatype"];
+		var order = ["memory","datatype","action"];
 		lib.async.series(order.map(function(name){
 			return function(cb){
 				src[name](lib,src,data,function(e,result){
@@ -21,7 +21,12 @@
 		"if","while","do","for","function","new","delete","typeof","void",
 		"undefined","boolean","true","false","integer","NaN","Infinity","string"];
 
-	var echo = function(cb){ return function(){ console.log("#",JSON.stringify(arguments,null,4)); cb.apply(null,arguments); }; };
+	var echo = function(cb,x){
+		return function(){
+			console.log("#echo",JSON.stringify(x?arguments[1]:arguments,null,4));
+			typeof(cb)==="function" && cb.apply(null,arguments);
+		};
+	};
 }
 
 program
@@ -54,7 +59,7 @@ statements
 statement
 	= "{" _ s:statements  "}" _ { s(callback); }
 	| ";" _ { callback(null,src.datatype.undefined.instance); }
-	| "echo" _ exp:expression ";" _ { exp(echo(callback)); }
+	| "echo" _ exp:expression ";" _ { exp(echo(callback,true)); }
 	| dec:declaration ";" _ { dec(callback); }
 	| exp:expression ";" _ { exp(callback); }
 	| "if" _ "(" _ c:expression ")" _ t:statement ("else" _ e:statement)?
@@ -78,8 +83,13 @@ statement
 				else src.action.loop(condition,next,then,callback);
 			});
 		}
-	| "return" _ exp:expression ";" _
-		{ exp(function(error,result){ callback(error || "function.return", result) }); }
+	| "for" _ "(" _ (d:"var" _)? i:identifier ("," _ j:identifier ("," _ k:identifier)?)? "in" _ exp:expression ")" _ then:statement
+		{ src.action.forin(d,i,j,k,exp,then,callback); }
+	| "return" _ (exp:expression)? ";" _
+		{
+			if(exp) exp(function(error,result){ callback(error || "function.return", result) });
+			else callback("function.return",src.datatype.undefined.instance);
+		}
 
 declaration
 	= "var" _1 left:identifier "=" _ right:exp_assign
@@ -196,7 +206,7 @@ integer
 		{ callback(null,src.datatype.integer["Infinity"]); }
 
 array
-	= "[" _ (item:exp_assign ("," _ item:exp_assign)*)? "]" _
+	= "[" _ (item:exp_assign ("," _ item:exp_assign)*)? ("," _)? "]" _
 		{
 			lib.async.series(a(item),callback,function(list){
 				new src.datatype.array(list,callback);
@@ -215,7 +225,7 @@ object_key
 
 object
 	= "{" _ (key:object_key ":" _ val:exp_assign
-		("," _ key:object_key ":" _ val:exp_assign)*)? "}" _
+		("," _ key:object_key ":" _ val:exp_assign)*)? ("," _)? "}" _
 		{
 			key = a(key); val = a(val);
 			lib.async.series(key.concat(val),callback,function(result){
