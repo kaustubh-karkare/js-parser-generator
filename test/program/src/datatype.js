@@ -296,7 +296,7 @@ datatype.$gettype = function(lib,src,data,callback){
 
 datatype.$operator = function(lib,src,data,callback){
 	// datatypes in increasing order of datatype size
-	var ordering = ["undefined","boolean","integer","string"];
+	var ordering = ["undefined","boolean","integer","array","object","string","function"];
 	var rank = function(obj){
 		for(var i=0; i<ordering.length; ++i)
 			if(obj instanceof src.datatype[ordering[i]])
@@ -305,19 +305,31 @@ datatype.$operator = function(lib,src,data,callback){
 	};
 
  	var fn = function(operator,left,right,callback){
-		if(left.__proto__ === right.__proto__ || operator==="===" || operator==="!=="){
-			if(left.__proto__ !== right.__proto__)
-				callback(null,src.datatype.boolean[operator[0]==="!"?"true":"false"]);
-			else left.operator(operator.slice(0,2),right,callback);
-		} else {
-			var type = ordering[Math.max(rank(left),rank(right))];
-			lib.async.series([
-				left.convert.bind(left,type),
-				right.convert.bind(right,type)
-			],callback,function(result){
-				result[0].operator(operator,result[1],callback);
+		if(operator==="||" || operator==="&&"){
+			left(function(e,left){
+				if(e) return callback(e,left);
+				left.convert("boolean",function(e,result){
+					if(e) return callback(e,result);
+					if(result===src.datatype.boolean.true ^ operator==="&&") callback(null,left);
+					else right(callback);
+				});
 			});
-		}
+		} else lib.async.series([left,right],callback,function(result){
+			left = result[0]; right = result[1];
+			if(left.__proto__ === right.__proto__ || operator==="===" || operator==="!=="){
+				if(left.__proto__ !== right.__proto__)
+					callback(null,src.datatype.boolean[operator[0]==="!"?"true":"false"]);
+				else left.operator(operator.slice(0,2),right,callback);
+			} else {
+				var type = ordering[Math.max(rank(left),rank(right))];
+				lib.async.series([
+					left.convert.bind(left,type),
+					right.convert.bind(right,type)
+				],callback,function(result){
+					result[0].operator(operator,result[1],callback);
+				});
+			}
+		});
 	};
 
 	callback(null,fn);

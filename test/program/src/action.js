@@ -6,6 +6,7 @@ module.exports = function(lib,src,data,callback){
 	result.assignment = function(left,operator,right,callback){
 		lib.async.series(left.concat(right),callback,function(names){
 			var value = names.pop(), result, last, scope;
+			var fnwrap = function(data){ return function(cb){ cb(null,data); }; };
 			lib.async.series(names.reverse().map(function(name,i){
 				return function(cb){
 					if(name.length===1){
@@ -17,12 +18,9 @@ module.exports = function(lib,src,data,callback){
 							},
 							function(n,cb2){
 								name = n;
-								if(operator[i]==="=") cb2(null,null);
-								else scope.operator("[]",name,cb2);
-							},
-							function(current,cb2){
 								if(operator[i]==="=") cb2(null,value);
-								else src.datatype.$operator(operator[i].slice(0,-1),current,value,cb2);
+								else src.datatype.$operator(operator[i].slice(0,-1),
+									scope.operator.bind(scope,"[]",name), fnwrap(value), cb2);
 							},
 							function(val,cb2){
 								scope.assign(name, value = val,cb2);
@@ -37,12 +35,9 @@ module.exports = function(lib,src,data,callback){
 							},
 							function(r,cb2){
 								result = r;
-								if(operator[i]==="=") cb2(null,null);
-								else result.operator("[]",last,cb2);
-							},
-							function(current,cb2){
 								if(operator[i]==="=") cb2(null,value);
-								else src.datatype.$operator(operator[i].slice(0,-1),current,value,cb2);
+								else src.datatype.$operator(operator[i].slice(0,-1),
+									result.operator.bind(result,"[]",last), fnwrap(value), cb2);
 							},
 							function(val,cb2){
 								if(!result.assign) cb2("assignment.invalid-reference");

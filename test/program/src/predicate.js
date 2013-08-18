@@ -24,16 +24,11 @@ module.exports = function(lib,src,data){
 		};
 		operation.prototype.eval = function(callback){
 			if(this.operator===undefined) this.left(callback);
-			else lib.async.series.call(this,[
-				this.left.eval.bind(this.left),
-				this.right.eval.bind(this.right)
-			], callback, function(result){
-				src.datatype.$operator(this.operator,result[0],result[1],callback);
-			});
+			else src.datatype.$operator( this.operator, this.left.eval.bind(this.left),
+				this.right.eval.bind(this.right), callback );
 		};
 
 		var bind = function(data,level){
-			// console.log("#",data.value);
 			var left = new operation(data.value.shift()), p;
 			while(data.operator.length){
 				if( (p=precedence[data.operator[0]]) <= level ) break;
