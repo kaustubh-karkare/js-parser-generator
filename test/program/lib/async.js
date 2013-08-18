@@ -39,7 +39,7 @@ var series = function(list,error,callback,wf){
 					if(wf) list[i].apply(context,args.concat(fn));
 					else list[i].call(context,fn);
 				else if(callback)
-					if(wf) callback.apply(context,error===callback?[null].concat(args):[args]);
+					if(wf) callback.apply(context,error===callback?[null].concat(args):args);
 					else callback.apply(context,error===callback?[null,result]:[result]);
 			});
 		})(null);

@@ -137,10 +137,11 @@ datatype.array = function(lib,src,data,callback){
 		"delete": function(key,callback){
 			key.convert("integer",(function(error,result){
 				if(error) return callback(error,result);
-				var i = result.value.num(),
-					j = this.value[i] || src.datatype.undefined.instance;
-				this.value[i] = src.datatype.undefined.instance;
-				callback(null,j);
+				var undef = src.datatype.undefined.instance,
+					i = result.value.num(),
+					j = (this.value[i] && this.value[i]!==undef);
+				this.value[i] = undef;
+				callback(null,src.datatype.boolean[j?"true":"false"]);
 			}).bind(this));
 		}
 	};
@@ -181,7 +182,7 @@ datatype.object = function(lib,src,data,callback){
 		"delete": function(key,callback){
 			var temp = this.value[key.value];
 			delete this.value[key.value];
-			callback(null,temp);
+			callback(null,src.datatype.boolean[temp?"true":"false"]);
 		}
 	};
 	callback(null,x);

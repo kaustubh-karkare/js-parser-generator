@@ -13,71 +13,73 @@ module.exports = function(lib,src,data,callback){
 	data.access = [];
 	data.access.last = last(data.access);
 
-	var find = function(type,name,value,callback){
-		var a = data.access.last();
-		for(var i=0; i<a.length; ++i)
-			if(name in data.scope[a[i]])
-				switch(type){
-					case "get":
-						return callback(null, data.scope[a[i]][name]);
-					case "set":
-						return callback(null, data.scope[a[i]][name] = value);
-					case "del":
-						var temp = data.scope[a[i]][name];
-						delete data.scope[a[i]][name];
-						return callback(null,temp);
-				}
-		var lenient = true;
-		switch(type){
-			case "get":
-				if(lenient) return callback(null,src.datatype.undefined.instance);
-				else return callback("src.memory.get.undefined");
-			case "set":
-				if(lenient) return callback(null,data.scope[a[0]][name]=value);
-				else return callback("src.memory.set.undefined");
-			case "del":
-				if(lenient) return callback(null,src.datatype.undefined.instance);
-				else return callback("src.memory.del.undefined");
-		}
-	};
-
 	var result = {
-		"new" : function(name,value,callback){
-			// note: overwrite of existing value possible
-			var i = data.access.last()[0];
-			data.scope[i][name] = value;
-			callback(null,value);
+
+		"get" : function(name,callback,getscope){
+			name = {value:name};
+			var undef = src.datatype.undefined.instance, scope, first;
+			lib.async.waterfall(data.access.last().map(function(a,i){
+				return function(result,cb){
+					if(i===0){ cb = result; first = data.scope[a]; }
+					else if(result!==undef) return cb(null,result);
+					if(getscope) scope = data.scope[a];
+					data.scope[a].operator("[]",name,cb);
+				};
+			}),callback,function(result){
+				// in case scope is required for an undefined variable, return the first one
+				callback(null,getscope?(result===undef?first:scope):result);
+			});
 		},
-		"get" : function(name,callback){ find("get",name,null,callback); },
-		"set" : function(name,value,callback){ find("set",name,value,callback); },
-		"del" : function(name,callback){ find("del",name,null,callback); },
+		"set" : function(name,value,callback){
+			name = {value:name};
+			// note: overwrite of existing value possible
+			data.scope[data.access.last()[0]].assign(name,value,callback);
+		},
+		"del" : function(name,callback){
+			name = {value:name};
+			var t = src.datatype.boolean.true;
+			lib.async.waterfall(data.access.last().map(function(a,i){
+				return function(result,cb){
+					if(i===0) cb = result;
+					else if(result===t) return cb(null,result);
+					data.scope[a].delete(name,cb);
+				};
+			}),callback);
+		},
 
 		"function" : {
 			"new" : function(callback){
 				callback(null,data.access.last());
 			},
 			"start" : function(callee,access,labels,argsdata,callback){
-				lib.async.series([
-					function(cb){ new src.datatype.object({},cb); },
+				var undef = src.datatype.undefined.instance;
+				lib.async.waterfall([
 					function(cb){
-						new src.datatype.object({
-							key: argsdata.map(function(v,i){ return {"value":i}; }),
-							val: argsdata
-						},cb);
+						if(data.access.length===0) cb(null,null);
+						else cb(null,data.scope[data.access.last()[0]].value.arguments.value.callee);
 					},
-				], callback, function(result){
-					var obj = result[0].value, undef = src.datatype.undefined.instance;;
-					obj.local = result[0];
-					if(data.scope.length){
-						result[1].value.callee = callee || undef;
-						result[1].value.caller = data.scope.last().arguments.value.callee || undef;
+					function(caller,cb){
+						var keys = argsdata.map(function(v,i){ return {"value":i}; }), vals = argsdata;
+						if(data.access.length){
+							keys.push({"value":"callee"},{"value":"caller"});
+							vals.push(callee || undef, caller || undef);
+						}
+						new src.datatype.object({ key: keys, val: vals },cb);
+					},
+					function(args,cb){
+						var keys = [{"value":"arguments"}], vals = [args];
+						for(var i=0; i<labels.length; ++i)
+							keys.push({"value":labels[i]}),
+							vals.push(argsdata[i]||undef);
+						new src.datatype.object({ key:keys, val:vals },cb);
+					},
+					function(local,cb){ local.assign({"value":"local"},local,cb); },
+					// the object.prototype.assign function returns the assigned value
+					function(local,cb){
+						data.access.push([data.scope.push(local)-1].concat(access));
+						cb(null);
 					}
-					obj.arguments = result[1];
-					for(var i=0; i<labels.length; ++i)
-						obj[labels[i]] = argsdata[i] || undef;
-					data.access.push([data.scope.push(obj)-1].concat(access));
-					callback(null);
-				});
+				], callback);
 			},
 			"end" : function(callback){
 				data.access.pop();

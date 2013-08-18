@@ -88,7 +88,7 @@ declaration
 			left = a(left); right = a(right);
 			lib.async.series(left.concat(right),callback,function(result){
 				lib.async.series(result.slice(0,left.length).map(function(name,i){
-					return function(cb){ src.memory.new(name,result[i+left.length],cb); };
+					return function(cb){ src.memory.set(name,result[i+left.length],cb); };
 				}),callback,function(){ callback(null,src.datatype.undefined.instance); });
 			});
 		}
@@ -232,6 +232,8 @@ function
 		end:&{ this.result=this.index; return true; } _
 		{
 			lib.async.series.call(this,a(name),callback,function(args){
+				if(["this","local","arguments"].filter(function(x){ return args.indexOf(x)!==-1; }).length)
+					return callback("grammar.function.reserved-argument-name");
 				new src.datatype.function({ "args":args, "body":body, "str":this.data.slice(start,end) },callback);
 			});
 		}

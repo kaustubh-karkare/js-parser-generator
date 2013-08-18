@@ -5,16 +5,40 @@ module.exports = function(lib,src,data,callback){
 
 	result.assignment = function(left,operator,right,callback){
 		lib.async.series(left.concat(right),callback,function(names){
-			var value = names.pop(), result;
+			var value = names.pop(), result, last, scope;
 			lib.async.series(names.reverse().map(function(name,i){
-				if(name.length>1){
-					return function(cb){
+				return function(cb){
+					if(name.length===1){
 						lib.async.waterfall([
-							function(cb2){ src.action.primary([],name[0],name.slice(1,-1),cb2); },
+							function(cb2){ src.memory.get(name[0],cb2,true); },
+							function(s,cb2){
+								scope = s;
+								new src.datatype.string(name[0],cb2);
+							},
+							function(n,cb2){
+								name = n;
+								if(operator[i]==="=") cb2(null,null);
+								else scope.operator("[]",name,cb2);
+							},
+							function(current,cb2){
+								if(operator[i]==="=") cb2(null,value);
+								else src.datatype.$operator(operator[i].slice(0,-1),current,value,cb2);
+							},
+							function(val,cb2){
+								scope.assign(name, value = val,cb2);
+							}
+						],cb);
+					} else {
+						lib.async.waterfall([
+							// resolve all references but the last one
+							function(cb2){
+								last = name.pop();
+								src.action.primary([],name[0],name.slice(1),cb2);
+							},
 							function(r,cb2){
 								result = r;
 								if(operator[i]==="=") cb2(null,null);
-								else result.operator("[]",name[name.length-1],cb2);
+								else result.operator("[]",last,cb2);
 							},
 							function(current,cb2){
 								if(operator[i]==="=") cb2(null,value);
@@ -22,23 +46,11 @@ module.exports = function(lib,src,data,callback){
 							},
 							function(val,cb2){
 								if(!result.assign) cb2("assignment.invalid-reference");
-								else result.assign(name[name.length-1],value = val,cb2);
+								else result.assign(last,value = val,cb2);
 							}
 						],cb);
-					};
-				} else if(name[0]==="this"){
-					return callback("assignment.cannot-modify-this");
-				} else if(operator[i]==="="){
-					return function(cb){ src.memory.set(name[0],value,cb); };
-				} else {
-					return function(cb){
-						lib.async.waterfall([
-							function(cb2){ src.memory.get(name[0],cb2); },
-							function(current,cb2){ src.datatype.$operator(operator[i].slice(0,-1),current,value,cb2); },
-							function(next,cb2){ src.memory.set(name[0],value=next,cb2); }
-						],cb);
-					};
-				}
+					} // if name.length>1
+				};
 			}),callback,function(){ callback(null,value); });
 		});
 	};
@@ -145,11 +157,11 @@ module.exports = function(lib,src,data,callback){
 					case "delete":
 						var last = post.pop();
 						if(typeof(result)!=="string" || last && last.id==="()")
-							callback("delete.cannot-delete-value");
+							callback("src.action.primary.delete.reference-required");
 						else if(!last) src.memory.del(result,fn);
 						else ac(pre,result,post,function(e,r){
 							if(e) callback(e,r);
-							else if(!r.delete) callback("deletion.invalid-reference");
+							else if(!r.delete) callback("src.action.primary.delete.invalid-scope");
 							else r.delete(last,fn);
 						});
 						return;
