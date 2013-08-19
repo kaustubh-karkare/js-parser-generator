@@ -76,7 +76,7 @@ statement
 				else src.action.loop(condition,next,then,callback);
 			});
 		}
-	| "for" _ "(" _ (d:"var" _)? i:identifier ("," _ j:identifier ("," _ k:identifier)?)? "in" _ exp:expression ")" _ then:statement
+	| "for" _ "(" _ (d:"var" _)? i:identifier ( "," _ j:identifier ("," _ k:identifier)?)? "in" _ exp:expression ")" _ then:statement
 		{ src.action.forin(d,i,j,k,exp,then,callback); }
 	| "continue" _ ";" _ { callback("syntax.continue"); }
 	| "break" _ ";" _ { callback("syntax.break"); }
@@ -87,8 +87,8 @@ statement
 		}
 	| "throw" _ e:expression ";" _
 		{ e(function(e,r){ callback(e||r); }); }
-	| "try" _ t:sblock ("catch" _ "(" _ i:identifier ")" _ c:sblock )? ("finally" _ f:sblock)?
-		{ src.action.trycatch(t,i,c,f,callback); }
+	| "try" _ t:sblock "catch" _ "(" _ i:identifier ")" _ c:sblock
+		{ src.action.trycatch(t,i,c,callback); }
 	| exp:expression ";" _ { exp(callback); }
 
 declaration

@@ -233,26 +233,18 @@ module.exports = function(lib,src,data,callback){
 		fn(null, name);
 	};
 
-	result.trycatch = function(t,i,c,f,callback){
+	result.trycatch = function(t,i,c,callback){
 		t(function(e,r){
 			if(["syntax.return","syntax.break","syntax.continue"].indexOf(e)!==-1) callback(e,r);
-			else if(!e || !c) return f ? f(callback) : callback(null,r);
+			else if(!e || !c) return callback(null,r);
 			else {
-				var name, scope, error, val, len = data.scope.trycatch.length;
+				var name, error;
 				lib.async.waterfall([
 					function(cb){ if(typeof(e)==="string") new src.datatype.string(e,cb); else cb(null,e); },
 					function(e,cb){ error = e; i(cb); },
-					function(n,cb){ name = n; src.memory.get(name,cb,1); },
-					function(s,cb){ scope = s; name = {"value":name}; scope.operator("[]",name,cb); },
-					function(v,cb){ data.scope.trycatch.push(v); scope.assign(name,error,cb) },
+					function(n,cb){ name = n; src.memory.set(name,error,cb); },
 					function(e,cb){ c(cb); },
-					function(r,cb){ val = r; scope.assign(name,data.scope.trycatch.pop(),cb); },
-					function(v,cb){ f?f(cb):cb(null,val); }
-				],function(error,result){
-					if(data.scope.trycatch.length>len)
-						data.scope.trycatch.length = len;
-					callback(error,result);
-				});
+				],callback);
 			}
 		});
 	};

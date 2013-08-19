@@ -9,7 +9,6 @@ var last = function(a){
 module.exports = function(lib,src,data,callback){
 	data.scope = [];
 	data.scope.last = last(data.scope);
-	data.scope.trycatch = [];
 
 	data.access = [];
 	data.access.last = last(data.access);

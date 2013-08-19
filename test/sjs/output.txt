@@ -1,0 +1,304 @@
+
+Generated Parser (12 ms)
+========================
+
+[suppressed]
+
+Input Program : 1-expressions-functions-closure.js
+==================================================
+
+
+1 + 25 * 20 + 4 / 2 - 13%10 ; // arithmetic operations
+!true - (-1) + "2"; // implicit type casting
+1<2 ? -1>-2 ? 42 : -666 : -666 ; // ternary operator
+if(1==true && -Infinity < +Infinity) 0/0; else 666; // if statement
+
+closure = function(){
+	var count = 1;
+	return function(){
+		return count+=1;
+	};
+}();
+closure();
+count = 10;
+closure();
+
+
+Syntax Tree (326 ms)
+====================
+
+[suppressed]
+
+Execution Result (25 ms)
+========================
+
+[
+    "integer: 500",
+    "string: 12",
+    "integer: 42",
+    "integer: NaN",
+    "function: function(){\n\t\treturn count+=1;\n\t}",
+    "integer: 2",
+    "integer: 10",
+    "integer: 3"
+]
+
+
+Input Program : 2-arrays-objects.js
+===================================
+
+
+JSON = {
+	stringify : function(data){
+		if(typeof(data)==="array"){
+			var result = "[";
+			for(var i=0; i<data.length; i+=1)
+				result += (i===0?"":",") + data[i];
+			return result + "]";
+		} else if(typeof(data)==="integer" || typeof(data)==="string"){
+			return data+"";
+		}
+	}
+};
+
+square = [0,1,4,7,16,25,36,49,64,81,100,121];
+
+square[3] = 9;
+square.length;
+JSON.stringify(square);
+square.length = 11;
+JSON.stringify(square);
+
+obj = {
+	"int":1,
+	"str":"two",
+	"arr":[3,4],
+	"no":{"a":"b","c":"d"},
+	"fn":function(x){ return x*x; }
+};
+
+for(i=error=0; i<=10; i+=1)
+	if(square[i]!==obj.fn(i))
+		error += 1;
+"Errors = "+error;
+
+
+Syntax Tree (1180 ms)
+=====================
+
+[suppressed]
+
+Execution Result (120 ms)
+=========================
+
+[
+    "object: [object]",
+    "array: [array]",
+    "integer: 9",
+    "integer: 12",
+    "string: [0,1,4,9,16,25,36,49,64,81,100,121]",
+    "integer: 11",
+    "string: [0,1,4,9,16,25,36,49,64,81,100]",
+    "object: [object]",
+    "undefined: ",
+    "string: Errors = 0"
+]
+
+
+Input Program : 3-constructors-prototypes.js
+============================================
+
+
+var being = function(name,age){
+	if(!this) return new arguments.callee(name,age);
+	this.name = name;
+	this.age = age;
+	this.str = function(){ return this.name+this.slash+this.age; };
+};
+
+being.prototype = {"slash":"/"};
+
+var animal = function(species,name,age){
+	this.species = species;
+	this.prototype = new being(name,age);
+	this.str = function(){ return this.species+me.slash+this.prototype.str(); };
+};
+
+var me = new animal("human","kaustubh",22);
+me.slash = "-";
+me.str();
+me.species + me.slash + me.name + me.slash + me.age;
+
+
+Syntax Tree (595 ms)
+====================
+
+[suppressed]
+
+Execution Result (15 ms)
+========================
+
+[
+    "undefined: ",
+    "object: [object]",
+    "undefined: ",
+    "undefined: ",
+    "string: -",
+    "string: human-kaustubh/22",
+    "string: human-kaustubh-22"
+]
+
+
+Input Program : 4-try-catch-finally.js
+======================================
+
+
+var a = 0;
+
+try {
+	a += 1;
+	throw a;
+	a *= -1;
+} catch(e){
+	a += 1;
+}
+
+"checkpoint="+a;
+
+try {
+	a += 1;
+} catch(e){
+	a += 1;
+}
+
+"checkpoint="+a;
+
+
+Syntax Tree (120 ms)
+====================
+
+[suppressed]
+
+Execution Result (5 ms)
+=======================
+
+[
+    "undefined: ",
+    [
+        "integer: 2"
+    ],
+    "string: checkpoint=2",
+    [
+        "integer: 3"
+    ],
+    "string: checkpoint=3"
+]
+
+
+Input Program : 5-array-wrapper.js
+==================================
+
+
+var Array = function(data){
+	if(!this) return;
+	if(arguments.length===0){
+		this.raw = [];
+	} else if(arguments.length===1){
+		if(typeof(data)==="array"){
+			this.raw = data;
+		} else if(typeof(data)==="integer"){
+			this.raw = [];
+			this.raw.length = data;
+		} else {
+			this.raw = [data];
+		}
+	} else {
+		this.raw = [];
+		this.raw.length = arguments.length;
+		for(var i=0; i<arguments.length; i+=1)
+			this.raw[i] = arguments[i];
+	}
+};
+
+Array.prototype = {
+	find : function(item){
+		for(var i,j in this.raw)
+			if(j===item) return i;
+		return -1;
+	},
+	join : function(delim){
+		var result = "";
+		for(var i,j in this.raw)
+			result += (i?delim:"")+j;
+		return result;
+	},
+	map : function(fn){
+		var result = [];
+		result.length = this.raw.length;
+		for(var i,j,k in this.raw)
+			result[i] = fn(j,i,k);
+		return new Array(result);
+	},
+	pop : function(){
+		if(this.raw.length===0) return this.raw[0];
+		var last = this.raw[this.raw.length-1];
+		this.raw.length -= 1;
+		return last;
+	},
+	push : function(){
+		var l = this.raw.length;
+		this.raw.length += arguments.length;
+		for(var i=0; i<arguments.length; i+=1)
+			this.raw[l+i] = arguments[i];
+		return this.raw.length;
+	},
+	reverse : function(){
+		var l = this.raw.length-1;
+		for(var i,j,k in this.raw){
+			if(i>=l-i) break;
+			k[i] = k[l-i];
+			k[l-i] = j;
+		}
+		return this;
+	},
+	sort : function(){
+		var l = this.raw.length-1;
+		for(var x=0; x<l; x+=1)
+			for(var i,j,k in this.raw)
+				if(i<l && k[i]>k[i+1])
+					k[i] = k[i+1],
+					k[i+1] = j;
+		return this;
+	},
+	toString : function(){
+		return "["+this.map(function(i){
+			try { return i.toString(); }
+			catch(e){ return i; }
+		}).join(",")+"]";
+	}
+};
+
+var a = new Array(4,2,1,5,3);
+a.push(new Array(1,4),new Array(1,3));
+a.sort().reverse().pop();
+a.toString();
+
+
+
+Syntax Tree (4826 ms)
+=====================
+
+[suppressed]
+
+Execution Result (206 ms)
+=========================
+
+[
+    "undefined: ",
+    "object: [object]",
+    "undefined: ",
+    "integer: 7",
+    "integer: 1",
+    "string: [[1,3],[1,4],5,4,3,2]"
+]
+

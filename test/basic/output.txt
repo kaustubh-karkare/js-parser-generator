@@ -1,0 +1,38 @@
+
+	Grammer : a = s:'a' s:'B'i s:('c'/'C') { return s.join(''); }
+	Input   : abc
+	Value   : abc
+	Time    : 11 ms
+
+	Grammer : a = x:('a'/'A')* y:('a' 'a' 'a') { return x.join(''); }
+	Input   : aAaaa
+	Value   : aA
+	Time    : 7 ms
+
+	Grammer : a = x:'a'*? y:('a' 'b' 'c') { return x.join(''); }
+	Input   : aaabc
+	Value   : aa
+	Time    : 2 ms
+
+	Grammer : a = x:. &{ return x==='a'; } y:. !{ return y==='c'; } { return x+y; }
+	Input   : ab
+	Value   : ab
+	Time    : 3 ms
+
+	Grammer : a = ![^c] x:. &x:'d' . { return x.join(''); }
+	Input   : cd
+	Value   : cd
+	Time    : 1 ms
+
+	Grammer : a = &x:'a'* .* 'ab' { return x.join(''); }; 
+	Input   : aaab
+	Value   : aaa
+	Time    : 1 ms
+
+	Grammer : a = b = 'a' { return 42; }
+	Input   : a
+	Value   : null
+	Time    : 0 ms
+
+All tests completed successfully.
+

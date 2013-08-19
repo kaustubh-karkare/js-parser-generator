@@ -1,13 +1,15 @@
 
-## JavaScript Parser Generator
+## JavaScript Parser Generator (JSPG)
 
-    node test/basic # basic grammar constructs
-    node test/async # asynchronous evaluation of patterns
-    node test/program # a simple programming language
+### Examples
 
-Execution Results: [basic](https://gist.github.com/kaustubh-karkare/6209821), [async](https://gist.github.com/kaustubh-karkare/6209815) & [program](https://gist.github.com/kaustubh-karkare/6209800).
+	node test/basic # basic grammar constructs
+	node test/async # asynchronous evaluation of patterns
+	node test/sjs # simplified javascript interpreter
 
-## Usage
+The results of the above commands can be found in the `output.txt` files of each directory.
+
+### Usage
 
 ```javascript
 var pg = require("./src"),
@@ -15,7 +17,14 @@ var pg = require("./src"),
 	result = parser.parse( <string:data> , <array:init> );
 console.log(result);
 ```
-## Notes
+
+### Links
+
+* [JSPG: Grammar Syntax & Semantics](grammar.md)
+* [JSPG: Parser Configuration Options](config.md)
+* [Simplified JavaScript Interpreter](test/sjs/readme.md)
+
+### Notes
 
 * This project is based on http://pegjs.majda.cz/. There are, however, differences in implementation.
-* No external libraries nor JavaScript's inbuilt RegExp implementation have been used in the main code.
+* No external libraries nor JavaScript's inbuilt RegExp implementation have been used in the Parser Generator code.

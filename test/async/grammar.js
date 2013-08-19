@@ -34,4 +34,8 @@ exp_mul = left:primary (op:("*"/"/"/"%") _ right:primary)*
 
 primary = "(" _ exp:expression ")" _ { exp(callback); }
 	| d:[0-9]+ _ { callback(null,parseInt(a(d).join(''))); }
-	| "input" _ { input("Enter a Number: ",function(data){ callback(null,parseInt(data)); }); }
+	| "input" _
+		{
+			// input("Enter a Number: ",function(data){ callback(null,parseInt(data)); });
+			setTimeout(function(){ callback(null,42); },1000);
+		}
