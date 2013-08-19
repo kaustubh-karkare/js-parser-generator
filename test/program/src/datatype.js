@@ -195,7 +195,7 @@ datatype.object = function(lib,src,data,callback){
 		"operator": function(op,that,callback){
 			if(op==="==" || op==="!=") return callback(null,src.datatype.boolean[op==="!="^this===that?"true":"false"]);
 			if(op!=="[]") return callback("src.datatype.object.operator.unrecognized");
-			if(!this.value[that.value] && this.value.prototype
+			if( !this.value.hasOwnProperty(that.value) && this.value.prototype
 				&& this.value.prototype.__proto__===x.prototype )
 				this.value.prototype.operator(op,that,callback);
 			else callback(null, this.value[that.value] || src.datatype.undefined.instance);

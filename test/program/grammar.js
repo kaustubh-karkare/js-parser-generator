@@ -17,9 +17,6 @@
 	};
 
 	var a = function(x){ return Array.isArray(x) ? x : (x?[x]:[]); };
-	var keywords = [
-		"if","while","do","for","function","new","delete","typeof","void",
-		"undefined","boolean","true","false","integer","NaN","Infinity","string"];
 
 	var echo = function(cb,x){
 		return function(){
@@ -39,9 +36,7 @@ program
 					src.memory.function.start.bind(null,null,[],[],[]),
 					function(cb){
 						s(function(e,r){
-							if(e==="function.return") src.action.string(r,cb);
-							else if(e) cb(e,r);
-							else src.action.string(r,cb);
+							src.action.string(e||r,cb);
 						});
 					},
 					src.memory.function.end.bind(null)
@@ -52,16 +47,14 @@ program
 _ = &{ return src.predicate.whitespace(this); }
 _1 = &{ return src.predicate.whitespace(this,1); }
 
-statements
-	= s:statement*
-		{ lib.async.series(a(s),callback); }
+statements = s:statement* { lib.async.series(a(s),callback); }
+sblock = "{" _ s:statements "}" _ { s(callback); }
 
 statement
-	= "{" _ s:statements  "}" _ { s(callback); }
+	= sblock
 	| ";" _ { callback(null,src.datatype.undefined.instance); }
 	| "echo" _ exp:expression ";" _ { exp(echo(callback,true)); }
 	| dec:declaration ";" _ { dec(callback); }
-	| exp:expression ";" _ { exp(callback); }
 	| "if" _ "(" _ c:expression ")" _ t:statement ("else" _ e:statement)?
 		{ src.action.condition(c,t,e,callback); }
 	| "while" _ "(" _ condition:expression ")" _ then:statement
@@ -85,11 +78,18 @@ statement
 		}
 	| "for" _ "(" _ (d:"var" _)? i:identifier ("," _ j:identifier ("," _ k:identifier)?)? "in" _ exp:expression ")" _ then:statement
 		{ src.action.forin(d,i,j,k,exp,then,callback); }
+	| "continue" _ ";" _ { callback("syntax.continue"); }
+	| "break" _ ";" _ { callback("syntax.break"); }
 	| "return" _ (exp:expression)? ";" _
 		{
-			if(exp) exp(function(error,result){ callback(error || "function.return", result) });
-			else callback("function.return",src.datatype.undefined.instance);
+			if(exp) exp(function(error,result){ callback(error || "syntax.return", result) });
+			else callback("syntax.return",src.datatype.undefined.instance);
 		}
+	| "throw" _ e:expression ";" _
+		{ e(function(e,r){ callback(e||r); }); }
+	| "try" _ t:sblock ("catch" _ "(" _ i:identifier ")" _ c:sblock )? ("finally" _ f:sblock)?
+		{ src.action.trycatch(t,i,c,f,callback); }
+	| exp:expression ";" _ { exp(callback); }
 
 declaration
 	= "var" _1 left:identifier "=" _ right:exp_assign
@@ -144,7 +144,7 @@ op_unary
 
 exp_primary
 	= pre:op_prefix* name:( boolean | integer | string | array | object | function | identifier )
-		&{ return keywords.indexOf(name)===-1; } post:op_suffix*
+		&{ return src.predicate.keywords.indexOf(name)===-1; } post:op_suffix*
 		{
 			pre = a(pre); post = a(post);
 			lib.async.series(pre.concat(name).concat(post), callback, function(result){
@@ -182,12 +182,8 @@ op_suffix_function
 
 // Datatypes
 
-identifier = char:[$_A-Z]i (char:[$_A-Z0-9]i)* _ str:&{
-		var str = a(char).join("");
-		if(keywords.indexOf(str)!==-1) return false;
-		this.result = str;
-		return true;
-	} { callback(null,str); };
+identifier = str:&{ return src.predicate.identifier(this); } _
+	{ callback(null,str); }
 
 undefined = "undefined" _ { callback(null,src.datatype.undefined.instance); }
 

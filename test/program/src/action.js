@@ -3,6 +3,12 @@ module.exports = function(lib,src,data,callback){
 
 	var undef = src.datatype.undefined.instance;
 	var fnwrap = function(data){ return function(cb){ cb(null,data); }; };
+	var echo = function(cb,x){
+		return function(){
+			console.log(JSON.stringify(x?arguments[1]:arguments,null));
+			typeof(cb)==="function" && cb.apply(null,arguments);
+		};
+	};
 
 	var result = {};
 
@@ -54,9 +60,9 @@ module.exports = function(lib,src,data,callback){
 
 	result.condition = function(condition, then, alt, callback){
 		condition(function(e,r){
-			if(e) callback(e);
+			if(e) callback(e,r);
 			else r.convert("boolean",function(e,r){
-				if(e) callback(e);
+				if(e) callback(e,r);
 				else if(r.value) then(callback);
 				else if(alt) alt(callback);
 				else callback(null,undef);
@@ -66,15 +72,26 @@ module.exports = function(lib,src,data,callback){
 
 	result.loop = function(condition, next, then, callback){
 		// note: the list array only exists for debugging purposes
-		var list = [], fn = function(error,result){
+		var list = [], end = false, fn = function(error,result){
 			lib.async.waterfall([
 				function(cb){ cb(error,result); },
 				function(result,cb){ result.convert("boolean",cb); },
-				function(result,cb){ result.value ? then(cb) : cb("~"); },
-				function(result,cb){ list.push(result); next ? next(cb) : cb(null); }
-			],function(error){
-				if(error==="~") callback(null,undef);
-				else if(error) callback(error);
+				function(result,cb){
+					if(result.value) then(function(e,r){
+						if(e==="syntax.break"){ end = true; cb(null,r); }
+						else if(e==="syntax.continue") cb(null,r);
+						else cb(e,r);
+					});
+					else { end=true; cb(null,null); }
+				},
+				function(result,cb){
+					if(end) return cb(null);
+					list.push(result);
+					if(next) next(cb); else cb(null,result);
+				}
+			],function(error,result){
+				if(end) callback(null,undef);
+				else if(error) callback(error,result);
 				else condition(fn);
 			});
 		};
@@ -92,12 +109,18 @@ module.exports = function(lib,src,data,callback){
 				i = fnwrap([r[0]]);
 				j = j && fnwrap([r[1]]);
 				k = k && fnwrap([r[2]]);
+				end = false;
 				if(!exp.iterate) callback("grammar.for-in.iterable-type-required");
 				else exp.iterate(function(key,val,cb){
-					lib.async.series([
+					if(end) cb(null);
+					else lib.async.series([
 						src.action.assignment.bind(null,[i],["="],fnwrap(key)),
 						src.action.assignment.bind(null,[j],["="],fnwrap(val)),
-					].slice(0,j?2:1).concat(then),cb);
+					].slice(0,j?2:1).concat(then),function(e,r){
+						if(e==="syntax.continue") cb(null,r);
+						else if(e==="syntax.break") end = true, cb(null,r);
+						else cb(e,r);
+					});
 				},function(e,r){
 					if(e,r) callback(e,r);
 					else callback(null,undef);
@@ -173,7 +196,7 @@ module.exports = function(lib,src,data,callback){
 							function(r,cb){ result = r; new src.datatype.object({},cb); },
 							function(r,cb){ context = r; result.operator("()",[1,r,last],cb); }
 						],function(e,r){
-							if(!e || e==="function.return") callback(null,context);
+							if(!e || e==="syntax.return") callback(null,context);
 							else callback(e,r);
 						});
 					case "delete":
@@ -198,7 +221,7 @@ module.exports = function(lib,src,data,callback){
 					case "()":
 						if(typeof(result)==="string") return src.memory.get(result,fn);
 						else return result.operator(next.id, [0,prev,post.shift()], function(error,result){
-							if(error==="function.return") fn(null,result);
+							if(error==="syntax.return") fn(null,result);
 							else fn(error,undef);
 						});
 				}
@@ -208,10 +231,31 @@ module.exports = function(lib,src,data,callback){
 			}
 		};
 		fn(null, name);
-		// src.memory.get(name,callback);
+	};
+
+	result.trycatch = function(t,i,c,f,callback){
+		t(function(e,r){
+			if(["syntax.return","syntax.break","syntax.continue"].indexOf(e)!==-1) callback(e,r);
+			else if(!e || !c) return f ? f(callback) : callback(null,r);
+			else {
+				var name, scope, error, val, len = data.scope.trycatch.length;
+				lib.async.waterfall([
+					function(cb){ if(typeof(e)==="string") new src.datatype.string(e,cb); else cb(null,e); },
+					function(e,cb){ error = e; i(cb); },
+					function(n,cb){ name = n; src.memory.get(name,cb,1); },
+					function(s,cb){ scope = s; name = {"value":name}; scope.operator("[]",name,cb); },
+					function(v,cb){ data.scope.trycatch.push(v); scope.assign(name,error,cb) },
+					function(e,cb){ c(cb); },
+					function(r,cb){ val = r; scope.assign(name,data.scope.trycatch.pop(),cb); },
+					function(v,cb){ f?f(cb):cb(null,val); }
+				],function(error,result){
+					if(data.scope.trycatch.length>len)
+						data.scope.trycatch.length = len;
+					callback(error,result);
+				});
+			}
+		});
 	};
 
 	callback(null, result);
 };
-
-module.exports.toString = function(){ return "[cat]" };

@@ -40,6 +40,19 @@ module.exports = function(lib,src,data){
 		return function(that,data){ that.result = bind(data,-1); return true; };
 	})();
 
+	result.keywords = [
+		"if","while","do","for","in","break","continue",
+		"function","return","new","delete","typeof","void",
+		"undefined","true","false","NaN","Infinity"];
+
+	result.identifier = function(that){
+		var re = /[$_A-Z][$_A-Z0-9]*/ig;
+		re.lastIndex = that.index;
+		var x = re.exec(that.data);
+		if(!x || x.index!==that.index || result.keywords.indexOf(x[0])!==-1) return false;
+		else { that.result = x[0]; that.index+=x[0].length; return true; }
+	};
+
 	result.literal = function(that){ // used to read string & regexp literals
 		var c = that.data[that.index], d = c, e = {"t":"\t","n":"\n","r":"\r","v":"\v"};
 		if(c===undefined) return false;
